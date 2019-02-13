@@ -13,10 +13,10 @@
   "author": "Bastien Maes",
   "repository": {
     "type": "git",
-    "url": "https://github.com/BastienMaes/homebridge-S7"
+    "url": "https://github.com/BastienMaes/homebridge-S7.git"
   },
   "bugs": {
-    "url": "https://github.com/BastienMaes/homebridge-S7"
+    "url": "https://github.com/BastienMaes/homebridge-S7/issues"
   },
   "engines": {
     "node": ">=4.3.2",
