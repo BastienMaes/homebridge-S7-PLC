@@ -22,6 +22,7 @@
     "node": ">=4.3.2",
     "homebridge": ">=0.4.45"
   },
+  "preferGlobal": true,
   "dependencies": {
     "node-snap7": ">=1.0.1"
   }
