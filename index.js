@@ -4,8 +4,7 @@ var debugLightBulb = require('../homebridge/node_modules/hap-nodejs/node_modules
 var debugSensor    = require('../homebridge/node_modules/hap-nodejs/node_modules/debug')('homebridge-S7_Sensor')
 var Service, Characteristic;
 var snap7 = require('node-snap7');
-var S7Client = new snap7.S7Client();
-var ip;
+
 
 var S7accessory = {
     "S7_LightBulb": LightBulb,
@@ -18,10 +17,10 @@ module.exports = function(homebridge) {
   // Service and Characteristic from hap-nodejs/lib/gen/HomeKitTypes.js
   Service = homebridge.hap.Service;
   Characteristic = homebridge.hap.Characteristic;
-  homebridge.registerPlatform('homebridge-platform-S7', 'S7', S7Platform);
-  homebridge.registerAccessory('homebridge-s7plc', 'S7_LightDimm', LightDimm, true);
-  homebridge.registerAccessory('homebridge-s7plc', 'S7_LightBulb', LightBulb, true);
-  homebridge.registerAccessory('homebridge-s7plc', 'S7_Sensor', Sensor, true);
+  homebridge.registerPlatform('homebridge-S7', 'S7', S7Platform);
+  homebridge.registerAccessory('homebridge-S7', 'S7_LightDimm', LightDimm, true);
+  homebridge.registerAccessory('homebridge-S7', 'S7_LightBulb', LightBulb, true);
+  homebridge.registerAccessory('homebridge-S7', 'S7_Sensor', Sensor, true);
 }
 
 //Platform definitions
@@ -37,16 +36,22 @@ module.exports = function(homebridge) {
 //  ]
 
 function S7Platform(log, config) {
+    //initialize
 	this.log = log;
 	this.config = config;
-    ip = this.config.IP;
-    
-    S7PLCConnection(this.log, ip);
+    this.ip = this.config.IP;
+    this.S7Client = new snap7.S7Client();
+    //PLC connection synchonousely...
+    this.log(">> S7Client connecting to %s", this.ip);
+    this.S7Client.ConnectTo(this.ip, 0, 1);
 }
 
 S7Platform.prototype = {
-    accessories: function(callback) {
     
+    //Accessories retrieval
+    accessories: function(callback) {
+        var log = this.log;
+
         debug('Fetching S7 devices...');
         //For each device, create an accessory!
         var foundAccessories = this.config.accessories;
@@ -57,12 +62,40 @@ S7Platform.prototype = {
             debug('Parsing accessory ' + i + ' of ' + foundAccessories.length);
             this.log('Pushing new ' + foundAccessories[i].accessory + ' device: ' + foundAccessories[i].name);
             //Call accessoryConstruction
-            var accessory = new S7accessory[foundAccessories[i].accessory](this.log, foundAccessories[i]);
+            var accessory = new S7accessory[foundAccessories[i].accessory](this, foundAccessories[i]);
             debug('Creating ' + accessory.name + ' accessory ...');
             platformAccessories.push(accessory);
         }
         this.log(platformAccessories.length + ' accessories created');
         callback(platformAccessories);
+    },
+    
+    //PLC connection check function
+    S7ClientReconnect: function() {
+        var log = this.log;
+        var S7Client = this.S7Client;
+        var ip = this.ip;
+        
+        if (!S7Client.Connected()) {
+            log("S7ClientReconnect: >> S7Client connecting to %s", ip);
+            //PLC connection synchonousely...
+            //this.S7Client.ConnectTo(this.ip, 0, 1);
+            
+            //PLC connection asynchonousely...
+            S7Client.ConnectTo(ip, 0, 1, function(err) {
+              if(err) {
+                log('S7ClientReconnect: >> Connection failed. Code #' + err + ' - ' + S7Client.ErrorText(err));
+                
+              }
+              else {
+                log("S7ClientReconnect: connected to %s", ip);
+                
+              }
+            });
+        }
+        else {
+            debug("S7Client already connected to %s", ip);
+        }
     }
 }
 
@@ -87,9 +120,10 @@ S7Platform.prototype = {
 */
 
 //LightBulb function
-function LightBulb(log, config) {
+function LightBulb(platform, config) {
     this.FirmwareRevision = '0.0.1';
-    this.log = log;
+    this.platform = platform;
+    this.log = platform.log;
     this.name = config.name;
     this.db = config.DB;
     this.dbbyte = config.Byte;
@@ -107,23 +141,30 @@ LightBulb.prototype = {
     
     //LightBulb send PLC commands ON/OFF or value(%)
     var log = this.log;
+    var platform = this.platform;
+    var S7Client = this.platform.S7Client;
     var buf = this.buf;
     var db = this.db;
     var dbbyte = this.dbbyte;
     var dbbiton = this.dbbiton;
     var dbbitoff = this.dbbitoff;
     var dbbit = 0;
+    var state = this.state;
     
     debugLightBulb("setPowerOn: START");
 
     //check PLC connection
-    S7PLCConnection(log, ip);
+    platform.S7ClientReconnect();
 
     //Set the correct Bit for the operation
-    if (powerOn) 
+    if (powerOn) {
       dbbit = dbbiton;
-    else 
+      state=1;
+    }
+    else {
       dbbit = dbbitoff;
+      state=0;
+    }
       
     buf[0] = Math.pow(2, dbbit);
 
@@ -135,7 +176,7 @@ LightBulb.prototype = {
         callback(err);
       }
       else {
-        log("setPowerOn: Set power state to %s. Set bit DB%d.DBX%d.%d", this.state, db, dbbyte, dbbit);
+        log("setPowerOn: Set power state to %s. Set bit DB%d.DBX%d.%d", state, db, dbbyte, dbbit);
         callback(null);
       }
     });
@@ -146,6 +187,8 @@ LightBulb.prototype = {
   getPowerOn: function(callback) {
     //LightBulb get PLC status ON/OFF
     var log = this.log;
+    var platform = this.platform;
+    var S7Client = this.platform.S7Client;
     var db = this.db;
     var dbbyte = this.dbbyte;
     var dbbit = this.dbbitstate;
@@ -156,7 +199,7 @@ LightBulb.prototype = {
     debugLightBulb("getPowerOn: START");
 
     //check PLC connection
-    S7PLCConnection(log, ip);
+    platform.S7ClientReconnect();
  
     // Read one byte from PLC DB asynchonousely...
     S7Client.ReadArea(S7Client.S7AreaDB, db, dbbyte, 1, S7Client.S7WLByte, function(err, res) {
@@ -213,9 +256,10 @@ LightBulb.prototype = {
 */
 
 //LightDimm function
-function LightDimm(log, config) {
+function LightDimm(platform, config) {
     this.FirmwareRevision = '0.0.1';
-    this.log = log;
+    this.platform = platform;
+    this.log = platform.log;
     this.name = config.name;
     this.db = config.DB;
     this.dbbyte = config.Byte;
@@ -230,6 +274,8 @@ LightDimm.prototype = {
   setPowerOn: function(powerOn, callback) { 
     //LightDimm send PLC commands ON/OFF
     var log = this.log;
+    var platform = this.platform;
+    var S7Client = this.platform.S7Client;
     var buf = this.buf1;
     var db = this.db;
     var dbbyte = this.dbbyte;
@@ -237,7 +283,7 @@ LightDimm.prototype = {
     debugLightDimm("setPowerOn: START");
 
     //check PLC connection
-    S7PLCConnection(log, ip);
+    platform.S7ClientReconnect();
 
     debugLightDimm("setPowerOn: powerOn=%d BrightnessVal=%d",powerOn,this.BrightnessVal);
         
@@ -269,6 +315,8 @@ LightDimm.prototype = {
   getPowerOn: function(callback) {
     //LightDimm get PLC status ON/OFF
     var log = this.log;
+    var platform = this.platform;
+    var S7Client = this.platform.S7Client;
     var db = this.db;
     var dbbyte = this.dbbyte;
     var buf = this.buf1;
@@ -277,7 +325,7 @@ LightDimm.prototype = {
     debugLightDimm("getPowerOn: START");
 
     //check PLC connection
-    S7PLCConnection(log, ip);
+    platform.S7ClientReconnect();
  
     // Read one word from PLC DB asynchonousely...
     S7Client.ReadArea(S7Client.S7AreaDB, db, dbbyte, 1, S7Client.S7WLByte, function(err, res) {
@@ -298,6 +346,8 @@ LightDimm.prototype = {
   setBrightness: function(brightness, callback) {
     //LightDimm send PLC commands value(%)
     var log = this.log;
+    var platform = this.platform;
+    var S7Client = this.platform.S7Client;
     var ip = this.ip;
     var buf = this.buf2;
     var db = this.db;
@@ -308,7 +358,7 @@ LightDimm.prototype = {
     this.BrightnessVal = brightness;
     
     //check PLC connection
-    S7PLCConnection(log, ip);
+    platform.S7ClientReconnect();
     
      debugLightDimm("setbrightness: brightness=%d",brightness);  
        
@@ -332,6 +382,8 @@ LightDimm.prototype = {
   getBrightness: function(callback) {
     //LightDimm get PLC status (%)
     var log = this.log;
+    var platform = this.platform;
+    var S7Client = this.platform.S7Client;
     var db = this.db;
     var dbbyte = this.dbbyte;
     var buf = this.buf2;
@@ -340,7 +392,7 @@ LightDimm.prototype = {
     debugLightDimm("getbrightness: START");
 
     //check PLC connection
-    S7PLCConnection(log, ip);
+    platform.S7ClientReconnect();
  
     // Read one word from PLC DB asynchonousely...
     S7Client.ReadArea(S7Client.S7AreaDB, db, dbbyte, 1, S7Client.S7WLByte, function(err, res) {
@@ -398,9 +450,10 @@ LightDimm.prototype = {
         }
 */
 //Sensor function
-function Sensor(log, config) {
+function Sensor(platform, config) {
     this.FirmwareRevision = '0.0.1';
-    this.log = log;
+    this.platform = platform;
+    this.log = platform.log;
     this.name = config.name;
     this.db = config.DB;
     this.dbbyte = config.Byte;
@@ -412,13 +465,15 @@ Sensor.prototype = {
   
   getCurrentValue: function(callback) {
     var log = this.log;
+    var platform = this.platform;
+    var S7Client = this.platform.S7Client;
     var db = this.db;
     var dbbyte = this.dbbyte;
     var value= this.value;
     debugSensor("getCurrentValue: START");
 
     //check PLC connection
-    S7PLCConnection(log, ip);
+    platform.S7ClientReconnect();
 
     // Read one real from DB asynchonousely...
     S7Client.ReadArea(S7Client.S7AreaDB, db, dbbyte, 1, S7Client.S7WLReal, function(err, res) {
@@ -458,19 +513,5 @@ Sensor.prototype = {
 				});
 
     return [sensorService,informationService];
-  }
-}
-
-//Common functions
-//PLC connection
-function S7PLCConnection(log, ip) {
-  //PLC connection check function
-  if (!S7Client.Connected()) {
-    log(">> S7Client connecting to %s", ip);
-    //PLC connection synchonousely...
-    S7Client.ConnectTo(ip, 0, 1);
-  }
-  else {
-    debug("S7Client %s already connected", ip);
   }
 }
