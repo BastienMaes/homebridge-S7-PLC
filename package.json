@@ -24,6 +24,6 @@
   },
   "preferGlobal": true,
   "dependencies": {
-    "node-snap7": ">=1.0.1"
+    "node-snap7": "file:../node-snap7"
   }
 }
