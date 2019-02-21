@@ -44,6 +44,7 @@ function S7Platform(log, config) {
     //PLC connection synchonousely...
     this.log(">> S7Client connecting to %s", this.ip);
     this.S7Client.ConnectTo(this.ip, 0, 1);
+    this.connecting = false;
 }
 
 S7Platform.prototype = {
@@ -75,23 +76,26 @@ S7Platform.prototype = {
         var log = this.log;
         var S7Client = this.S7Client;
         var ip = this.ip;
+        var connecting = this.connecting;
         
         if (!S7Client.Connected()) {
-            log("S7ClientReconnect: >> S7Client connecting to %s", ip);
-            //PLC connection synchonousely...
-            //this.S7Client.ConnectTo(this.ip, 0, 1);
-            
-            //PLC connection asynchonousely...
-            S7Client.ConnectTo(ip, 0, 1, function(err) {
-              if(err) {
-                log('S7ClientReconnect: >> Connection failed. Code #' + err + ' - ' + S7Client.ErrorText(err));
-                
-              }
-              else {
-                log("S7ClientReconnect: connected to %s", ip);
-                
-              }
-            });
+            log("S7ClientReconnect: >> S7Client connecting to %s connecting=%s", ip,connecting);
+
+            if (!connecting) {
+                this.connecting = true;
+                //PLC connection asynchonousely...
+                S7Client.ConnectTo(ip, 0, 1, function(err) {
+                  if(err) {
+                    log('S7ClientReconnect: >> Connection failed. Code #' + err + ' - ' + S7Client.ErrorText(err));
+                    log("S7ClientReconnect: >> S7Client connecting=%s", ip,connecting);
+                  }
+                  else {
+                    log("S7ClientReconnect: connected to %s", ip);
+                    
+                  }
+                  this.connecting = false;
+                });
+            }
         }
         else {
             debug("S7Client already connected to %s", ip);
@@ -115,7 +119,7 @@ S7Platform.prototype = {
            	"Byte" : 0,                       //Offset in the DB
             "ReadBitState" : 1                //Bit position of STATE status
            	"WriteBitOff" : 2,                //Bit position of OFF command
-           	"WriteBitOn" : 3,                 //Bit position of ON command
+           	"WriteBitOn" : 3                  //Bit position of ON command
     }
 */
 
@@ -184,7 +188,7 @@ LightBulb.prototype = {
     debugLightBulb("setPowerOn: END");
   },
   
-  getPowerOn: function(callback) {
+    getPowerOn: function(callback) {
     //LightBulb get PLC status ON/OFF
     var log = this.log;
     var platform = this.platform;
@@ -200,46 +204,52 @@ LightBulb.prototype = {
 
     //check PLC connection
     platform.S7ClientReconnect();
- 
-    // Read one byte from PLC DB asynchonousely...
-    S7Client.ReadArea(S7Client.S7AreaDB, db, dbbyte, 1, S7Client.S7WLByte, function(err, res) {
-      if(err) {
-        log('getPowerOn: >> DBRead failed. Code #' + err + ' - ' + S7Client.ErrorText(err));
-        S7Client.Disconnect();
-        state = 0;
-        callback(err, state);
+    
+    if (S7Client.Connected()) {
+        // Read one byte from PLC DB asynchonousely...
+        S7Client.ReadArea(S7Client.S7AreaDB, db, dbbyte, 1, S7Client.S7WLByte, function(err, res) {
+          if(err) {
+            log('getPowerOn: >> DBRead failed. Code #' + err + ' - ' + S7Client.ErrorText(err));
+            S7Client.Disconnect();
+            state = 0;
+            callback(err, state);
+          }
+          else {
+            if ((res[0] & value) == value) {
+              state = 1;
+              debugLightBulb("getPowerOn: Power is on");
+            }
+            else {
+              state = 0;
+              debugLightBulb("getPowerOn: Power is off");
+            }
+            debugLightBulb("getPowerOn: DB%d.DBX%d.%d: bytevalue=%d value=%d state=%d",  db, dbbyte, dbbit, res[0], value, state);
+            callback(null, state);
+          }
+        }); 
+        debugLightBulb("getPowerOn: END");
       }
-      else {
-        if ((res[0] & value) == value) {
-          state = 1;
-          debugLightBulb("getPowerOn: Power is on");
-        }
-        else {
-          state = 0;
-          debugLightBulb("getPowerOn: Power is off");
-        }
-        debugLightBulb("getPowerOn: DB%d.DBX%d.%d: bytevalue=%d value=%d state=%d",  db, dbbyte, dbbit, res[0], value, state);
-        callback(null, state);
-      }
-    }); 
-    debugLightBulb("getPowerOn: END");
-  },
-  
-  getServices: function() {
-    var informationService = new Service.AccessoryInformation();
-    informationService
-      .setCharacteristic(Characteristic.Manufacturer, 'BMA')
-      .setCharacteristic(Characteristic.Model, 'S7-Sensor')
-      .setCharacteristic(Characteristic.SerialNumber, '085-250-085')
-      .setCharacteristic(Characteristic.FirmwareRevision, this.FirmwareRevision);
-      
-    var lightbulbService = new Service.Lightbulb(this.name);
-    lightbulbService
-      .getCharacteristic(Characteristic.On)
-      .on('get', this.getPowerOn.bind(this))
-      .on('set', this.setPowerOn.bind(this));
-    return [lightbulbService,informationService];
-  }
+
+    else {
+        callback(new Error('PLC not connected'), false);
+    }
+},
+    
+    getServices: function() {
+        var informationService = new Service.AccessoryInformation();
+        informationService
+          .setCharacteristic(Characteristic.Manufacturer, 'BMA')
+          .setCharacteristic(Characteristic.Model, 'S7-Sensor')
+          .setCharacteristic(Characteristic.SerialNumber, '085-250-085')
+          .setCharacteristic(Characteristic.FirmwareRevision, this.FirmwareRevision);
+          
+        var lightbulbService = new Service.Lightbulb(this.name);
+        lightbulbService
+          .getCharacteristic(Characteristic.On)
+          .on('get', this.getPowerOn.bind(this))
+          .on('set', this.setPowerOn.bind(this));
+        return [lightbulbService,informationService];
+    }
 }
 
 //LightDimm
@@ -251,7 +261,7 @@ LightBulb.prototype = {
            	"name": "Salon",                  //Name
            	"descrition": "Lumière du salon", //Description
            	"DB": 1,                          //DB number
-           	"Byte" : 0,                       //Offset in the DB
+           	"Byte" : 0                        //Offset in the DB
     }
 */
 
@@ -326,22 +336,27 @@ LightDimm.prototype = {
 
     //check PLC connection
     platform.S7ClientReconnect();
- 
-    // Read one word from PLC DB asynchonousely...
-    S7Client.ReadArea(S7Client.S7AreaDB, db, dbbyte, 1, S7Client.S7WLByte, function(err, res) {
-      if(err) {
-        log('getPowerOn: >> DBRead failed. Code #' + err + ' - ' + S7Client.ErrorText(err));
-        S7Client.Disconnect();
-        callback(err, false);
+    if (S7Client.Connected()) {
+        // Read one word from PLC DB asynchonousely...
+        S7Client.ReadArea(S7Client.S7AreaDB, db, dbbyte, 1, S7Client.S7WLByte, function(err, res) {
+          if(err) {
+            log('getPowerOn: >> DBRead failed. Code #' + err + ' - ' + S7Client.ErrorText(err));
+            S7Client.Disconnect();
+            callback(err, false);
+          }
+          else {
+            debugLightDimm("getPowerOn: DB%d.DBW%d: %d",  db, dbbyte, res[0]);
+            me.BrightnessVal=res[0];
+            callback(null, res[0]!=0);
+          }
+        }); 
+        debugLightDimm("getPowerOn: END");
       }
-      else {
-        debugLightDimm("getPowerOn: DB%d.DBW%d: %d",  db, dbbyte, res[0]);
-        me.BrightnessVal=res[0];
-        callback(null, res[0]!=0);
-      }
-    }); 
-    debugLightDimm("getPowerOn: END");
-  },
+
+    else {
+        callback(new Error('PLC not connected'), false);
+    }
+},
 
   setBrightness: function(brightness, callback) {
     //LightDimm send PLC commands value(%)
@@ -393,22 +408,26 @@ LightDimm.prototype = {
 
     //check PLC connection
     platform.S7ClientReconnect();
- 
-    // Read one word from PLC DB asynchonousely...
-    S7Client.ReadArea(S7Client.S7AreaDB, db, dbbyte, 1, S7Client.S7WLByte, function(err, res) {
-      if(err) {
-        log('getbrightness: >> DBRead failed. Code #' + err + ' - ' + S7Client.ErrorText(err));
-        S7Client.Disconnect();
-        callback(err, this.BrightnessVal);
+    if (S7Client.Connected()) {
+        // Read one word from PLC DB asynchonousely...
+        S7Client.ReadArea(S7Client.S7AreaDB, db, dbbyte, 1, S7Client.S7WLByte, function(err, res) {
+          if(err) {
+            log('getbrightness: >> DBRead failed. Code #' + err + ' - ' + S7Client.ErrorText(err));
+            S7Client.Disconnect();
+            callback(err, this.BrightnessVal);
+          }
+          else {
+            debugLightDimm("getbrightness: DB%d.DBW%d: %d",  db, dbbyte, res[0]);
+            me.BrightnessVal=res[0];
+            callback(null, res[0]);
+          }
+        }); 
+        debugLightDimm("getbrightness: END");
       }
       else {
-        debugLightDimm("getbrightness: DB%d.DBW%d: %d",  db, dbbyte, res[0]);
-        me.BrightnessVal=res[0];
-        callback(null, res[0]);
-      }
-    }); 
-    debugLightDimm("getbrightness: END");
-  },
+        callback(new Error('PLC not connected'), 0);
+    }
+},
   
   getServices: function() {
     var informationService = new Service.AccessoryInformation();
@@ -474,25 +493,30 @@ Sensor.prototype = {
 
     //check PLC connection
     platform.S7ClientReconnect();
-
-    // Read one real from DB asynchonousely...
-    S7Client.ReadArea(S7Client.S7AreaDB, db, dbbyte, 1, S7Client.S7WLReal, function(err, res) {
-      if(err) {
-        log(' >> DBRead failed (DB' + db + '.DBD' + dbbyte + '):. Code #' + err + ' - ' + S7Client.ErrorText(err));
-        S7Client.Disconnect();
-        value = 0.0;
-        callback(err, null);
-      }
-      else {
-        debugSensor("getCurrentValue: DB%d.DBD%d: %f", db, dbbyte, res.readFloatBE(0));
-        value = res.readFloatBE(0);
-        callback(null, value);
-      }
-    });
     
-    debugSensor("getCurrentValue: END");
+    if (S7Client.Connected()) {
+        // Read one real from DB asynchonousely...
+        S7Client.ReadArea(S7Client.S7AreaDB, db, dbbyte, 1, S7Client.S7WLReal, function(err, res) {
+          if(err) {
+            log(' >> DBRead failed (DB' + db + '.DBD' + dbbyte + '):. Code #' + err + ' - ' + S7Client.ErrorText(err));
+            S7Client.Disconnect();
+            value = 0.0;
+            callback(err, null);
+          }
+          else {
+            debugSensor("getCurrentValue: DB%d.DBD%d: %f", db, dbbyte, res.readFloatBE(0));
+            value = res.readFloatBE(0);
+            callback(null, value);
+          }
+        });
+        
+        debugSensor("getCurrentValue: END");
 
-  },
+        }
+    else {
+        callback(new Error('PLC not connected'), this.minValue);
+    }
+},
   
   getServices: function() {
     var informationService = new Service.AccessoryInformation();
