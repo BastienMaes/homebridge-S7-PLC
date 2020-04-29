@@ -1,7 +1,7 @@
-var debug =          require('../homebridge/node_modules/hap-nodejs/node_modules/debug')('homebridge-S7') //debug messages ->https://github.com/visionmedia/debug
-var debugLightDimm = require('../homebridge/node_modules/hap-nodejs/node_modules/debug')('homebridge-S7_LightDimm') 
-var debugLightBulb = require('../homebridge/node_modules/hap-nodejs/node_modules/debug')('homebridge-S7_LightBulb')
-var debugSensor    = require('../homebridge/node_modules/hap-nodejs/node_modules/debug')('homebridge-S7_Sensor')
+var debug =          require('debug')('homebridge-S7') //debug messages ->https://github.com/visionmedia/debug
+var debugLightDimm = require('debug')('homebridge-S7_LightDimm') 
+var debugLightBulb = require('debug')('homebridge-S7_LightBulb')
+var debugSensor    = require('debug')('homebridge-S7_Sensor')
 var Service, Characteristic;
 var snap7 = require('node-snap7');
 

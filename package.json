@@ -1,7 +1,7 @@
 
 {
-  "name": "@bastienmaes/homebridge-S7",
-  "version": "0.0.3", 
+  "name": "@bastienmaes/homebridge-s7",
+  "version": "0.0.5", 
   "description": "SIEMENS S7 PLC plugin for HomeBridge(https://github.com/nfarina/homebridge).",
   "license": "MIT",
   "keywords": [
@@ -10,7 +10,7 @@
     "S7",
     "snap7"
   ],
-  "author": "Bastien Maes",,
+  "author": "Bastien Maes",
   "repository": {
     "type": "git",
     "url": "https://github.com/BastienMaes/homebridge-S7.git"
@@ -24,6 +24,7 @@
   },
   "preferGlobal": true,
   "dependencies": {
-    
+    "node-snap7" : ">=1.0.3",
+	"debug" : ">=4.1.1"
   }
 }
