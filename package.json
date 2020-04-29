@@ -1,7 +1,7 @@
 
 {
-  "name": "homebridge-S7",
-  "version": "0.0.1", 
+  "name": "@bastienmaes/homebridge-S7",
+  "version": "0.0.3", 
   "description": "SIEMENS S7 PLC plugin for HomeBridge(https://github.com/nfarina/homebridge).",
   "license": "MIT",
   "keywords": [
