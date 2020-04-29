@@ -10,10 +10,7 @@
     "S7",
     "snap7"
   ],
-  "author": "Bastien Maes",
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com/"
-  },
+  "author": "Bastien Maes",,
   "repository": {
     "type": "git",
     "url": "https://github.com/BastienMaes/homebridge-S7.git"
