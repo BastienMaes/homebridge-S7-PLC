@@ -1,7 +1,6 @@
-
 {
   "name": "homebridge-s7-plc",
-  "version": "0.0.5", 
+  "version": "0.0.6",
   "description": "SIEMENS S7 PLC plugin for HomeBridge (https://github.com/homebridge).",
   "license": "MIT",
   "keywords": [
@@ -26,7 +25,7 @@
   },
   "preferGlobal": true,
   "dependencies": {
-    "node-snap7" : ">=1.0.3",
-	"debug" : ">=4.1.1"
+    "node-snap7": ">=1.0.3",
+    "debug": ">=4.1.1"
   }
 }
