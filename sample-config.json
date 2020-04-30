@@ -7,13 +7,13 @@
 		"pin": "031-45-154"
 	},
     
-	"description": "Homebridge on Rpi3-BMA",
+	"description": "Homebridge on Rpi",
 
 
 	"platforms": [
         {
 		"platform": "S7",
-		"IP": "192.168.1.20",
+		"IP": "192.168.0.25",
 		"accessories": [
 
 			{
@@ -24,7 +24,7 @@
 			},
 			{
 				"accessory": "S7_LightBulb",
-				"name": "Chambre des filles",
+				"name": "Chambre",
 				"DB": 10,
 				"Byte" : 280,
 				"WriteBitOn" : 3,

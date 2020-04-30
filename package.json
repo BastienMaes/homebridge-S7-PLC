@@ -2,21 +2,23 @@
 {
   "name": "homebridge-s7-plc",
   "version": "0.0.5", 
-  "description": "SIEMENS S7 PLC plugin for HomeBridge(https://github.com/nfarina/homebridge).",
+  "description": "SIEMENS S7 PLC plugin for HomeBridge (https://github.com/homebridge).",
   "license": "MIT",
   "keywords": [
     "homebridge-plugin",
     "homebridge",
     "S7",
+    "PLC",
+    "SIEMENS",
     "snap7"
   ],
   "author": "Bastien Maes",
   "repository": {
     "type": "git",
-    "url": "https://github.com/BastienMaes/homebridge-S7.git"
+    "url": "https://github.com/BastienMaes/homebridge-S7-PLC.git"
   },
   "bugs": {
-    "url": "https://github.com/BastienMaes/homebridge-S7/issues"
+    "url": "https://github.com/BastienMaes/homebridge-S7-PLC/issues"
   },
   "engines": {
     "node": ">=4.3.2",

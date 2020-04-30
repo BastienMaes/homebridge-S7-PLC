@@ -1,7 +1,7 @@
-var debug =          require('debug')('homebridge-S7') //debug messages ->https://github.com/visionmedia/debug
-var debugLightDimm = require('debug')('homebridge-S7_LightDimm') 
-var debugLightBulb = require('debug')('homebridge-S7_LightBulb')
-var debugSensor    = require('debug')('homebridge-S7_Sensor')
+var debug =          require('debug')('homebridge-S7-PLC') //debug messages ->https://github.com/visionmedia/debug
+var debugLightDimm = require('debug')('homebridge-S7-PLC_LightDimm') 
+var debugLightBulb = require('debug')('homebridge-S7-PLC_LightBulb')
+var debugSensor    = require('debug')('homebridge-S7-PLC_Sensor')
 var Service, Characteristic;
 var snap7 = require('node-snap7');
 
@@ -17,10 +17,10 @@ module.exports = function(homebridge) {
   // Service and Characteristic from hap-nodejs/lib/gen/HomeKitTypes.js
   Service = homebridge.hap.Service;
   Characteristic = homebridge.hap.Characteristic;
-  homebridge.registerPlatform('homebridge-S7', 'S7', S7Platform);
-  homebridge.registerAccessory('homebridge-S7', 'S7_LightDimm', LightDimm, true);
-  homebridge.registerAccessory('homebridge-S7', 'S7_LightBulb', LightBulb, true);
-  homebridge.registerAccessory('homebridge-S7', 'S7_Sensor', Sensor, true);
+  homebridge.registerPlatform('homebridge-s7-plc', 'S7', S7Platform);
+  homebridge.registerAccessory('homebridge-s7-plc', 'S7_LightDimm', LightDimm, true);
+  homebridge.registerAccessory('homebridge-s7-plc', 'S7_LightBulb', LightBulb, true);
+  homebridge.registerAccessory('homebridge-s7-plc', 'S7_Sensor', Sensor, true);
 }
 
 //Platform definitions
