@@ -174,11 +174,11 @@ LightBulb.prototype = {
       dbbit = dbbitoff;
       state=0;
     }
-      
-    buf[0] = Math.pow(2, dbbit);
+    
+    buf[0] = 1;
 
-    // Write to DB asynchonousely...
-    S7Client.DBWrite(db, dbbyte, 1, buf, function(err) {
+    // Write single Bit to DB asynchonousely...
+    S7Client.WriteArea(S7Client.S7AreaDB, db, ((dbbyte*8) + dbbit), 1, S7Client.S7WLBit, buf, function(err) {
       if(err) {
         log('setPowerOn: >> DBWrite failed. Code #' + err + ' - ' + S7Client.ErrorText(err));
         S7Client.Disconnect();
@@ -201,7 +201,6 @@ LightBulb.prototype = {
     var db = this.db;
     var dbbyte = this.dbbyte;
     var dbbit = this.dbbitstate;
-    var value = Math.pow(2, dbbit);
     var buf = this.buf;
     var state = this.state;
     
@@ -211,8 +210,8 @@ LightBulb.prototype = {
     platform.S7ClientReconnect();
     
     if (S7Client.Connected()) {
-        // Read one byte from PLC DB asynchonousely...
-        S7Client.ReadArea(S7Client.S7AreaDB, db, dbbyte, 1, S7Client.S7WLByte, function(err, res) {
+        // Read one bit from PLC DB asynchonousely...
+        S7Client.ReadArea(S7Client.S7AreaDB, db, ((dbbyte*8) + dbbit), 1, S7Client.S7WLBit, function(err, res) {
           if(err) {
             log('getPowerOn: >> DBRead failed. Code #' + err + ' - ' + S7Client.ErrorText(err));
             S7Client.Disconnect();
@@ -220,7 +219,7 @@ LightBulb.prototype = {
             callback(err, state);
           }
           else {
-            if ((res[0] & value) == value) {
+            if (res[0]) {
               state = 1;
               debugLightBulb("getPowerOn: Power is on");
             }
@@ -228,7 +227,7 @@ LightBulb.prototype = {
               state = 0;
               debugLightBulb("getPowerOn: Power is off");
             }
-            debugLightBulb("getPowerOn: DB%d.DBX%d.%d: bytevalue=%d value=%d state=%d",  db, dbbyte, dbbit, res[0], value, state);
+            debugLightBulb("getPowerOn: DB%d.DBX%d.%d: bitvalue=%d state=%d",  db, dbbyte, dbbit, res[0], state);
             callback(null, state);
           }
         }); 
