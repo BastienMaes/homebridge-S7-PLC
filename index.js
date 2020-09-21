@@ -31,8 +31,8 @@ module.exports = function(homebridge) {
 //        {
 //      "platform": "S7",
 //      "IP": "10.10.10.10",
-//      "RACK: "0",
-//      "SLOT: "2",
+//      "RACK": 0,
+//      "SLOT": 2,
 //      "accessories": []
 //  }
 //  ]
@@ -42,8 +42,8 @@ function S7Platform(log, config) {
     this.log = log;
     this.config = config;
     this.ip = this.config.IP;
-    this.rack = Number(this.config.RACK);
-    this.slot = Number(this.config.SLOT);
+    this.rack = this.config.RACK;
+    this.slot = this.config.SLOT;
     this.S7Client = new snap7.S7Client();
     //PLC connection synchonousely...
     this.log(">> S7Client connecting to %s (%s:%s)", this.ip, this.rack , this.slot);
