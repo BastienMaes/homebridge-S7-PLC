@@ -55,11 +55,22 @@
                 {
                     "accessory": "S7_LightBulb",
                     "name": "Chambre",
+                    "manufacturer": "additional identification",
                     "DB": 10,
                     "Byte" : 280,
                     "WriteBitOn" : 3,
                     "WriteBitOff" : 2,
                     "ReadBitState" : 1
+                },
+                {
+                    "accessory": "S7_Outlet",
+                    "name": "TV",
+                    "manufacturer": "additional identification",
+                    "DB": 10,
+                    "Byte" : 280,
+                    "WriteBitOn" : 10,
+                    "WriteBitOff" : 9,
+                    "ReadBitState" : 8
                 },
                 {
                     "accessory": "S7_Sensor",

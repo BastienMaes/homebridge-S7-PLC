@@ -2,25 +2,37 @@ var debug =          require('debug')('homebridge-S7-PLC') //debug messages ->ht
 var debugLightDimm = require('debug')('homebridge-S7-PLC_LightDimm') 
 var debugLightBulb = require('debug')('homebridge-S7-PLC_LightBulb')
 var debugSensor    = require('debug')('homebridge-S7-PLC_Sensor')
-var Service, Characteristic;
+var debugThermostat   = require('debug')('homebridge-S7-PLC_Thermostat')
+var Accessory, Service, Characteristic, UUIDGen;
 var snap7 = require('node-snap7');
 
 
 var S7accessory = {
     "S7_LightBulb": LightBulb,
     "S7_LightDimm": LightDimm,
-    "S7_Sensor" : Sensor   
+    "S7_Outlet": LightBulb,
+    "S7_Sensor" : Sensor,
+    "S7_Humidity" : Sensor,
+    "S7_Temperature" : Sensor,
+    "S7_Thermostat" : Thermostat
 }//this var is used to have a unique constructor for accessories instanciation in platform
 
 //Exports
 module.exports = function(homebridge) {
   // Service and Characteristic from hap-nodejs/lib/gen/HomeKitTypes.js
+  var platformName = 'homebridge-s7-plc';
   Service = homebridge.hap.Service;
   Characteristic = homebridge.hap.Characteristic;
-  homebridge.registerPlatform('homebridge-s7-plc', 'S7', S7Platform);
-  homebridge.registerAccessory('homebridge-s7-plc', 'S7_LightDimm', LightDimm, true);
-  homebridge.registerAccessory('homebridge-s7-plc', 'S7_LightBulb', LightBulb, true);
-  homebridge.registerAccessory('homebridge-s7-plc', 'S7_Sensor', Sensor, true);
+  UUIDGen = homebridge.hap.uuid;
+  Accessory = homebridge.platformAccessory;
+  homebridge.registerPlatform(platformName, 'S7', S7Platform);
+  homebridge.registerAccessory(platformName, 'S7_LightDimm', LightDimm, true);
+  homebridge.registerAccessory(platformName, 'S7_LightBulb', LightBulb, true);
+  homebridge.registerAccessory(platformName, 'S7_Outlet', LightBulb, true);  
+  homebridge.registerAccessory(platformName, 'S7_Sensor', Sensor, true);
+  homebridge.registerAccessory(platformName, 'S7_Humidity', Sensor, true);
+  homebridge.registerAccessory(platformName, 'S7_Temperature', Sensor, true);  
+  homebridge.registerAccessory(platformName, 'S7_Thermostat', Thermostat, true);  
 }
 
 //Platform definitions
@@ -119,7 +131,7 @@ S7Platform.prototype = {
     {
             "accessory": "S7_LightBulb",      //Type
             "name": "Salon",                  //Name
-            "descrition": "Lumière du salon", //Description
+            "manufacturer": "Lumière du salon", //Manufacturer used as additional Description
             "DB": 1,                          //DB number
             "Byte" : 0,                       //Offset in the DB
             "ReadBitState" : 1                //Bit position of STATE status
@@ -134,6 +146,8 @@ function LightBulb(platform, config) {
     this.platform = platform;
     this.log = platform.log;
     this.name = config.name;
+    this.manufacturer = ('manufacturer' in config) ? config.manufacturer : 'S7-PLC';
+    this.isOutlet = (config.accessory == 'S7_Outlet' );
     this.db = config.DB;
     this.dbbyte = config.Byte;
     this.dbbiton = config.WriteBitOn;
@@ -234,25 +248,25 @@ LightBulb.prototype = {
         debugLightBulb("getPowerOn: END");
       }
 
-    else {
+      else {
         callback(new Error('PLC not connected'), false);
-    }
-},
-    
+      }
+    },
+        
     getServices: function() {
         var informationService = new Service.AccessoryInformation();
         informationService
-          .setCharacteristic(Characteristic.Manufacturer, 'BMA')
-          .setCharacteristic(Characteristic.Model, 'S7-Sensor')
+          .setCharacteristic(Characteristic.Manufacturer, this.manufacturer)
+          .setCharacteristic(Characteristic.Model, this.isOutlet ? 'S7-Outlet' : 'S7-LightBulb')
           .setCharacteristic(Characteristic.SerialNumber, '085-250-085')
           .setCharacteristic(Characteristic.FirmwareRevision, this.FirmwareRevision);
-          
-        var lightbulbService = new Service.Lightbulb(this.name);
-        lightbulbService
+        
+        var service = this.isOutlet ? new Service.Outlet(this.name, this.name + 'Outlet') : new Service.Lightbulb(this.name, this.name + 'Lightbulb');        
+        service
           .getCharacteristic(Characteristic.On)
           .on('get', this.getPowerOn.bind(this))
           .on('set', this.setPowerOn.bind(this));
-        return [lightbulbService,informationService];
+        return [service,informationService];
     }
 }
 
@@ -274,6 +288,7 @@ function LightDimm(platform, config) {
     this.platform = platform;
     this.log = platform.log;
     this.name = config.name;
+    this.manufacturer = ('manufacturer' in config) ? config.manufacturer : 'S7-PLC';
     this.db = config.DB;
     this.dbbyte = config.Byte;
     this.buf1 = Buffer.alloc(2);
@@ -435,12 +450,12 @@ LightDimm.prototype = {
   getServices: function() {
     var informationService = new Service.AccessoryInformation();
     informationService
-      .setCharacteristic(Characteristic.Manufacturer, 'BMA')
-      .setCharacteristic(Characteristic.Model, 'S7-Sensor')
+      .setCharacteristic(Characteristic.Manufacturer, this.manufacturer)
+      .setCharacteristic(Characteristic.Model, 'S7-Dim')
       .setCharacteristic(Characteristic.SerialNumber, '085-250-085')
       .setCharacteristic(Characteristic.FirmwareRevision, this.FirmwareRevision);
       
-    var LightDimmService = new Service.Lightbulb(this.name);
+    var LightDimmService = new Service.Lightbulb(this.name, this.name + 'Lightbulb');
     LightDimmService
       .getCharacteristic(Characteristic.Brightness)
       .on('get', this.getBrightness.bind(this))
@@ -459,12 +474,14 @@ LightDimm.prototype = {
   }
 }
 
+
+
+
 //Sensor
 //config.json:
 /*
         {
             "accessory": "s7_sensor",               //Type
-            "PLC_IP_Adr": "1.1.1.1",                //PLC IP address
             "name": "Extérieure",                   //Name
             "descrition": "Température extérieure", //Description
             "DB": 1,                                //DB number
@@ -477,6 +494,8 @@ function Sensor(platform, config) {
     this.platform = platform;
     this.log = platform.log;
     this.name = config.name;
+    this.manufacturer = ('manufacturer' in config) ? config.manufacturer : 'S7-PLC';
+    this.isHumidity = (config.accessory == 'S7_Humidity' );
     this.db = config.DB;
     this.dbbyte = config.Byte;
     this.value = 0.0;
@@ -513,32 +532,269 @@ Sensor.prototype = {
           }
         });
         
-        debugSensor("getCurrentValue: END");
+      debugSensor("getCurrentValue: END");
 
-        }
+    }
     else {
         callback(new Error('PLC not connected'), this.minValue);
     }
-},
+  },
   
   getServices: function() {
     var informationService = new Service.AccessoryInformation();
     informationService
-      .setCharacteristic(Characteristic.Manufacturer, 'BMA')
-      .setCharacteristic(Characteristic.Model, 'S7-Sensor')
+      .setCharacteristic(Characteristic.Manufacturer, this.manufacturer)
+      .setCharacteristic(Characteristic.Model, this.isHumidity ? 'S7-Humidity' : 'S7-Temperature')
       .setCharacteristic(Characteristic.SerialNumber, '085-250-085')
       .setCharacteristic(Characteristic.FirmwareRevision, this.FirmwareRevision);
       
-    var sensorService = new Service.TemperatureSensor(this.name);
-    sensorService
-      .getCharacteristic(Characteristic.CurrentTemperature)
-      .on('get', this.getCurrentValue.bind(this))
-      .setProps({
-                    minValue: -50,
-                    maxValue: 50,
-                    minStep: 0.1
-                });
+    var service;
+    
+    if (this.isHumidity) {
+      service = new Service.HumiditySensor(this.name, this.name + 'HumiditySensor');
+        service
+          .getCharacteristic(Characteristic.CurrentRelativeHumidity)
+          .on('get', this.getCurrentValue.bind(this))
+          .setProps({
+                        minValue: 0,
+                        maxValue: 100,
+                        minStep: 0.1
+                    });
+    }
+    else{    
+      service = new Service.TemperatureSensor(this.name, this.name + 'TemperatureSensor');
+        service
+          .getCharacteristic(Characteristic.CurrentTemperature)
+          .on('get', this.getCurrentValue.bind(this))
+          .setProps({
+                        minValue: -50,
+                        maxValue: 50,
+                        minStep: 0.1
+                    });
+      }
+    return [service,informationService];
+  }
+}
 
-    return [sensorService,informationService];
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//Sensor
+//config.json:
+/*
+        {
+            "accessory": "S7_Thermostat",               //Type
+            "name": "Extérieure",                   //Name
+            "descrition": "Température extérieure", //Description
+            "DB": 1,                                //DB number
+            "Byte" : 0                              //Offset in the DB
+        }
+*/
+
+function Thermostat(platform, config) {
+    this.FirmwareRevision = '0.0.1';
+    this.platform = platform;
+    this.log = platform.log;
+    this.name = config.name;
+    this.manufacturer = ('manufacturer' in config) ? config.manufacturer : 'S7-PLC';
+    this.db = config.DB;
+    this.getCurrentTempOffset = config.getCurrentTempOffset
+    this.getTargetTempOffset = config.getTargetTempOffset;
+    this.setTargetTempOffset  = config.setTargetTempOffset;
+    this.buf = Buffer.alloc(4);
+    var uuid = UUIDGen.generate("this.name + 'Thermostat'");
+    this.accessory = new Accessory(this.name, uuid);    
+    this.service = new Service.Thermostat(this.name);
+    this.accessory.addService(this.service);
+
+    this.accessory.getService(Service.AccessoryInformation)
+      .setCharacteristic(Characteristic.Manufacturer, this.manufacturer)
+      .setCharacteristic(Characteristic.Model, 'S7-Thermostat')
+      .setCharacteristic(Characteristic.SerialNumber, uuid)
+      .setCharacteristic(Characteristic.FirmwareRevision, this.FirmwareRevision); 
+      
+      // create handlers for required characteristics
+      this.service.getCharacteristic(Characteristic.CurrentHeatingCoolingState)
+        .on('get', this.handleCurrentHeatingCoolingStateGet.bind(this));
+
+      this.service.getCharacteristic(Characteristic.TargetHeatingCoolingState)
+        .on('get', this.handleTargetHeatingCoolingStateGet.bind(this))
+        .on('set', this.handleTargetHeatingCoolingStateSet.bind(this));
+
+      this.service.getCharacteristic(Characteristic.CurrentTemperature)
+        .on('get', this.handleCurrentTemperatureGet.bind(this));
+
+      this.service.getCharacteristic(Characteristic.TargetTemperature)
+        .on('get', this.handleTargetTemperatureGet.bind(this))
+        .on('set', this.handleTargetTemperatureSet.bind(this));
+
+      this.service.getCharacteristic(Characteristic.TemperatureDisplayUnits)
+        .on('get', this.handleTemperatureDisplayUnitsGet.bind(this))
+        .on('set', this.handleTemperatureDisplayUnitsSet.bind(this));    
+    this.log("Starting a S7_Thermostat Service '" + this.name + "' on DB%d.DBD%d", this.db, this.dbbyte);
+}
+
+Thermostat.prototype = {
+
+  getServices: function() {
+    var informationService = new Service.AccessoryInformation();
+    informationService
+    .setCharacteristic(Characteristic.Manufacturer, "EQ-3")
+    .setCharacteristic(Characteristic.Model, "Max! Cube")
+    return [informationService, this.service];
+  },
+
+
+  getValue: function(callback, offset) {
+    var log = this.log;
+    var platform = this.platform;    
+    var S7Client = this.platform.S7Client;
+    debugSensor("getCurrentValue: START");
+
+    //check PLC connection
+    this.platform.S7ClientReconnect();
+    
+    if (S7Client.Connected()) {
+        // Read one real from DB asynchonousely...
+        S7Client.ReadArea(S7Client.S7AreaDB, this.db, offset, 1, S7Client.S7WLReal, function(err, res) {
+          if(err) {
+            log(' >> DBRead failed (DB' + this.db + '.DBD' + offset + '):. Code #' + err + ' - ' + S7Client.ErrorText(err));
+            S7Client.Disconnect();
+            callback(err, null);
+          }
+          else {
+            log("getCurrentValue: DB%d.DBD%d: %f", this.db, offset, res.readFloatBE(0));
+            var value = res.readFloatBE(0);
+            callback(null, value);
+          }
+        });
+        
+      debugSensor("getCurrentValue: END");
+    }
+    else {
+        callback(new Error('PLC not connected'), null);
+    }
+  },
+  
+
+
+  /**
+   * Handle requests to get the current value of the "Current Heating Cooling State" characteristic
+   */
+  handleCurrentHeatingCoolingStateGet: function(callback) {
+    this.log('Triggered GET CurrentHeatingCoolingState');
+
+    // set this to a valid value for CurrentHeatingCoolingState
+    const currentValue = 1;
+
+    callback(null, currentValue);
+  },
+
+
+  /**
+   * Handle requests to get the current value of the "Target Heating Cooling State" characteristic
+   */
+  handleTargetHeatingCoolingStateGet: function(callback) {
+    this.log('Triggered GET TargetHeatingCoolingState');
+
+    // set this to a valid value for TargetHeatingCoolingState
+    const currentValue = 1;
+
+    callback(null, currentValue);
+  },
+
+  /**
+   * Handle requests to set the "Target Heating Cooling State" characteristic
+   */
+  handleTargetHeatingCoolingStateSet: function(value, callback) {
+    this.log('Triggered SET TargetHeatingCoolingState %s:', value);
+
+    callback(null);
+  },
+
+  /**
+   * Handle requests to get the current value of the "Current Temperature" characteristic
+   */
+  handleCurrentTemperatureGet: function(callback) {
+    this.log('Triggered GET CurrentTemperature');
+
+    this.getValue(callback, this.getCurrentTempOffset);
+  },
+
+
+  /**
+   * Handle requests to get the current value of the "Target Temperature" characteristic
+   */
+  handleTargetTemperatureGet: function(callback) {
+    this.log('Triggered GET TargetTemperature');
+
+    this.getValue(callback, this.getTargetTempOffset);
+  },
+
+  /**
+   * Handle requests to set the "Target Temperature" characteristic
+   */
+  handleTargetTemperatureSet: function(value, callback) {
+    this.log('Triggered SET TargetTemperature %s:', value);
+    var platform = this.platform;    
+    var S7Client = this.platform.S7Client;
+
+    //check PLC connection
+    platform.S7ClientReconnect();
+    
+    if (S7Client.Connected()) {
+        this.buf.writeFloatBE(value, 0);
+        // Read one real from DB asynchonousely...
+        S7Client.WriteArea(S7Client.S7AreaDB, this.db, this.setTargetTempOffset, 1, S7Client.S7WLReal, this.buf, function(err) {
+          if(err) {
+            this.log(' >> DBWritefailed (DB' + this.db + '.DBD' + dbbyte + '):. Code #' + err + ' - ' + S7Client.ErrorText(err));
+            S7Client.Disconnect();
+            value = 0.0;
+            callback(err);
+          }
+          else {
+            
+            callback(null);
+          }
+        });
+        
+
+
+    }
+    else {
+        callback(new Error('PLC not connected'), this.minValue);
+    }
+  },
+
+  /**
+   * Handle requests to get the current value of the "Temperature Display Units" characteristic
+   */
+  handleTemperatureDisplayUnitsGet: function(callback) {
+    this.log('Triggered GET TemperatureDisplayUnits');
+
+    // set this to a valid value for TemperatureDisplayUnits
+    const currentValue = 1;
+
+    callback(null, currentValue);
+  },
+
+  /**
+   * Handle requests to set the "Temperature Display Units" characteristic
+   */
+  handleTemperatureDisplayUnitsSet: function(value, callback) {
+    this.log('Triggered SET TemperatureDisplayUnits %s:', value);
+
+    callback(null);
   }
 }
