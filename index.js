@@ -27,23 +27,27 @@ module.exports = function(homebridge) {
 //S7
 //config.json:
 
-//	"platforms": [
+//  "platforms": [
 //        {
-//		"platform": "S7",
-//		"IP": "10.10.10.10",
-//		"accessories": []
-//	}
+//      "platform": "S7",
+//      "IP": "10.10.10.10",
+//      "RACK: "0",
+//      "SLOT: "2",
+//      "accessories": []
+//  }
 //  ]
 
 function S7Platform(log, config) {
     //initialize
-	this.log = log;
-	this.config = config;
+    this.log = log;
+    this.config = config;
     this.ip = this.config.IP;
+    this.rack = Number(this.config.RACK);
+    this.slot = Number(this.config.SLOT);
     this.S7Client = new snap7.S7Client();
     //PLC connection synchonousely...
-    this.log(">> S7Client connecting to %s", this.ip);
-    this.S7Client.ConnectTo(this.ip, 0, 1);
+    this.log(">> S7Client connecting to %s (%s:%s)", this.ip, this.rack , this.slot);
+    this.S7Client.ConnectTo(this.ip, this.rack , this.slot);
     this.connecting = false;
 }
 
@@ -76,21 +80,23 @@ S7Platform.prototype = {
         var log = this.log;
         var S7Client = this.S7Client;
         var ip = this.ip;
+        var rack = this.rack;
+        var slot = this.slot;
         var connecting = this.connecting;
         
         if (!S7Client.Connected()) {
-            log("S7ClientReconnect: >> S7Client connecting to %s connecting=%s", ip,connecting);
+            log("S7ClientReconnect: >> S7Client connecting to %s (%s:%s) connecting=%s", ip, rack, slot, connecting);
 
             if (!connecting) {
                 this.connecting = true;
                 //PLC connection asynchonousely...
-                S7Client.ConnectTo(ip, 0, 1, function(err) {
+                S7Client.ConnectTo(ip, rack, slot, function(err) {
                   if(err) {
                     log('S7ClientReconnect: >> Connection failed. Code #' + err + ' - ' + S7Client.ErrorText(err));
-                    log("S7ClientReconnect: >> S7Client connecting=%s", ip,connecting);
+                    log("S7ClientReconnect: >> S7Client connecting=%s", connecting);
                   }
                   else {
-                    log("S7ClientReconnect: connected to %s", ip);
+                    log("S7ClientReconnect: connected to %s (%s:%s)", ip, rack, slot);
                     
                   }
                   this.connecting = false;
@@ -98,7 +104,7 @@ S7Platform.prototype = {
             }
         }
         else {
-            debug("S7Client already connected to %s", ip);
+            debug("S7Client already connected to %s (%s:%s)", ip, rack, slot);
         }
     }
 }
@@ -110,16 +116,15 @@ S7Platform.prototype = {
 //LightBulb
 //config.json:
 /*
-   	{
-           	"accessory": "S7_LightBulb",      //Type
-           	"PLC_IP_Adr": "1.1.1.1",          //PLC IP address
-           	"name": "Salon",                  //Name
-           	"descrition": "Lumière du salon", //Description
-           	"DB": 1,                          //DB number
-           	"Byte" : 0,                       //Offset in the DB
+    {
+            "accessory": "S7_LightBulb",      //Type
+            "name": "Salon",                  //Name
+            "descrition": "Lumière du salon", //Description
+            "DB": 1,                          //DB number
+            "Byte" : 0,                       //Offset in the DB
             "ReadBitState" : 1                //Bit position of STATE status
-           	"WriteBitOff" : 2,                //Bit position of OFF command
-           	"WriteBitOn" : 3                  //Bit position of ON command
+            "WriteBitOff" : 2,                //Bit position of OFF command
+            "WriteBitOn" : 3                  //Bit position of ON command
     }
 */
 
@@ -255,13 +260,12 @@ LightBulb.prototype = {
 //LightDimm
 //config.json:
 /*
-   	{
-           	"accessory": "S7_LightDimm",      //Type
-           	"PLC_IP_Adr": "1.1.1.1",          //PLC IP address
-           	"name": "Salon",                  //Name
-           	"descrition": "Lumière du salon", //Description
-           	"DB": 1,                          //DB number
-           	"Byte" : 0                        //Offset in the DB
+    {
+            "accessory": "S7_LightDimm",      //Type
+            "name": "Salon",                  //Name
+            "descrition": "Lumière du salon", //Description
+            "DB": 1,                          //DB number
+            "Byte" : 0                        //Offset in the DB
     }
 */
 
@@ -444,9 +448,9 @@ LightDimm.prototype = {
       .on('set', this.setBrightness.bind(this))
       .setProps({
                     minValue: 20,
-					maxValue: 100,
-					minStep: 1
-				});
+                    maxValue: 100,
+                    minStep: 1
+                });
     
     LightDimmService
       .getCharacteristic(Characteristic.On)
@@ -460,12 +464,12 @@ LightDimm.prototype = {
 //config.json:
 /*
         {
-           	"accessory": "s7_sensor",               //Type
-           	"PLC_IP_Adr": "1.1.1.1",                //PLC IP address
-           	"name": "Extérieure",                   //Name
-           	"descrition": "Température extérieure", //Description
-           	"DB": 1,                                //DB number
-           	"Byte" : 0                              //Offset in the DB
+            "accessory": "s7_sensor",               //Type
+            "PLC_IP_Adr": "1.1.1.1",                //PLC IP address
+            "name": "Extérieure",                   //Name
+            "descrition": "Température extérieure", //Description
+            "DB": 1,                                //DB number
+            "Byte" : 0                              //Offset in the DB
         }
 */
 //Sensor function
@@ -532,9 +536,9 @@ Sensor.prototype = {
       .on('get', this.getCurrentValue.bind(this))
       .setProps({
                     minValue: -50,
-					maxValue: 50,
-					minStep: 0.1
-				});
+                    maxValue: 50,
+                    minStep: 0.1
+                });
 
     return [sensorService,informationService];
   }
