@@ -8,7 +8,7 @@ var snap7 = require('node-snap7');
 
 
 var S7accessory = {
-    "S7_LightBulb": LightBulb,
+    "S7_LightBulb": WindowCovering,
     "S7_LightDimm": LightDimm,
     "S7_Outlet": LightBulb,
     "S7_Sensor" : Sensor,
@@ -28,7 +28,7 @@ module.exports = function(homebridge) {
   Accessory = homebridge.platformAccessory;
   homebridge.registerPlatform(platformName, 'S7', S7Platform);
   homebridge.registerAccessory(platformName, 'S7_LightDimm', LightDimm, true);
-  homebridge.registerAccessory(platformName, 'S7_LightBulb', LightBulb, true);
+  homebridge.registerAccessory(platformName, 'S7_LightBulb', Thermostat, true);
   homebridge.registerAccessory(platformName, 'S7_Outlet', LightBulb, true);  
   homebridge.registerAccessory(platformName, 'S7_Sensor', Sensor, true);
   homebridge.registerAccessory(platformName, 'S7_Humidity', Sensor, true);
@@ -151,20 +151,34 @@ function LightBulb(platform, config) {
     this.FirmwareRevision = '0.0.1';
     this.platform = platform;
     this.log = platform.log;
-    this.name = config.name;
-    this.manufacturer = ('manufacturer' in config) ? config.manufacturer : 'S7-PLC';
-    this.isOutlet = (config.accessory == 'S7_Outlet' );
-    this.db = config.DB;
-    this.dbbyte = config.Byte;
-    this.dbbiton = config.WriteBitOn;
-    this.dbbitoff = config.WriteBitOff;
-    this.dbbitstate = config.ReadBitState;
+    this.config = config;
     this.buf = Buffer.alloc(2);
     this.state = 0;
-    debugLightBulb("Starting a S7_Lightbulb Service '" + this.name + "' on DB%d.DBB%d", this.db, this.dbbyte);
+
+
+    var informationService = new Service.AccessoryInformation();
+    informationService
+      .setCharacteristic(Characteristic.Manufacturer, this.manufacturer)
+      .setCharacteristic(Characteristic.Model, this.isOutlet ? 'S7-Outlet' : 'S7-LightBulb')
+      .setCharacteristic(Characteristic.SerialNumber, '085-250-085')
+      .setCharacteristic(Characteristic.FirmwareRevision, this.FirmwareRevision);
+    
+    var service = this.isOutlet ? new Service.Outlet(this.name, this.name + 'Outlet') : new Service.Lightbulb(this.name, this.name + 'Lightbulb');        
+    service
+      .getCharacteristic(Characteristic.On)
+      .on('get', function(callback) {this.getPowerOn(callback, this.db, this.dbbyte, this.dbbitstate)}.bind(this))
+      .on('set', function(powerOn, callback) { this.setPowerOn(powerOn, callback, this.db, this.dbbyte, this.dbbiton, this.dbbitoff)}.bind(this));
+    return [service,informationService];
+    
+    
 }
 //LightBulb prototype
 LightBulb.prototype = {
+
+  getServices: function() {
+    return [this.accessory.getService(Service.AccessoryInformation), this.service];
+  },
+
 
   setPowerOn: function(powerOn, callback, db, dbbyte, dbbiton, dbbitoff) {
     
@@ -802,42 +816,54 @@ Thermostat.prototype = {
 
 
 function WindowCovering(platform, config) {
-    this.FirmwareRevision = '0.0.1';
-    this.platform = platform;
-    this.log = platform.log;
-    this.name = config.name;
-    this.manufacturer = ('manufacturer' in config) ? config.manufacturer : 'S7-PLC';
-    this.db = config.DB;
-    this.getCurrentPositionOffset = config.getCurrentPositionOffset
-    this.getTargetPositionOffset = config.getTargetPositionOffset;
-    this.setTargetPositionOffset  = config.setTargetPositionOffset;
-    this.buf = Buffer.alloc(4);
-    var uuid = UUIDGen.generate("this.name + 'WindowCovering'");
-    this.accessory = new Accessory(this.name, uuid);    
+  this.platform = platform;
+  this.log = platform.log;
+  this.name = config.name;
+  this.buf = Buffer.alloc(4);
+  var uuid = UUIDGen.generate(config.name + config.accessory);
+  this.accessory = new Accessory(this.name, uuid); 
+
+  if (config.accessory == 'S7_LightBulb') {   
+    this.service =  new Service.Lightbulb(this.name);
+    this.accessory.addService(this.service);
+
+    this.service.getCharacteristic(Characteristic.On)
+      .on('get', function(callback) {this.getBit(callback, config.db, config.dbbyte, config.dbbitstate)}.bind(this))
+      .on('set', function(powerOn, callback) { this.setOnOffBit(powerOn, callback, config.db, config.dbbyte, config.dbbiton, config.dbbitoff)}.bind(this));
+  }
+  else if (config.accessory == 'S7_Thermostat') { 
+
     this.service = new Service.WindowCovering(this.name);
     this.accessory.addService(this.service);
 
-    this.accessory.getService(Service.AccessoryInformation)
-      .setCharacteristic(Characteristic.Manufacturer, this.manufacturer)
-      .setCharacteristic(Characteristic.Model, 'S7-WindowCovering')
-      .setCharacteristic(Characteristic.SerialNumber, uuid)
-      .setCharacteristic(Characteristic.FirmwareRevision, this.FirmwareRevision); 
+    // create handlers for required characteristics
+    this.service.getCharacteristic(Characteristic.CurrentPosition)
+      .on('get', this.handleCurrentPositionGet.bind(this));
+
+    this.service.getCharacteristic(Characteristic.TargetPosition)
+      .on('get', this.handleTargetPositionGet.bind(this))
+      .on('set', this.handleTargetPositionSet.bind(this));
+
+    this.service.getCharacteristic(Characteristic.PositionState)
+      .on('get', this.handlePositionStateGet.bind(this));
       
-      // create handlers for required characteristics
-      this.service.getCharacteristic(Characteristic.CurrentPosition)
-        .on('get', this.handleCurrentPositionGet.bind(this));
+    this.service.getCharacteristic(Characteristic.HoldPosition)
+      .on('set', this.handleHoldPosition.bind(this));
 
-      this.service.getCharacteristic(Characteristic.TargetPosition)
-        .on('get', this.handleTargetPositionGet.bind(this))
-        .on('set', this.handleTargetPositionSet.bind(this));
+      this.db = config.DB;
+      this.getCurrentPositionOffset = config.getCurrentPositionOffset
+      this.getTargetPositionOffset = config.getTargetPositionOffset;
+      this.setTargetPositionOffset  = config.setTargetPositionOffset;
 
-      this.service.getCharacteristic(Characteristic.PositionState)
-        .on('get', this.handlePositionStateGet.bind(this));
-        
-      this.service.getCharacteristic(Characteristic.HoldPosition)
-        .on('set', this.handleHoldPosition.bind(this));
-        
-    this.log("Starting a S7_Thermostat Service '" + this.name + "' on DB%d.DBD%d", this.db, this.dbbyte);
+    }
+      
+      this.accessory.getService(Service.AccessoryInformation)
+      .setCharacteristic(Characteristic.Manufacturer, ('manufacturer' in config) ? config.manufacturer : 'S7-PLC')
+      .setCharacteristic(Characteristic.Model, config.accessory)
+      .setCharacteristic(Characteristic.SerialNumber, uuid)
+      .setCharacteristic(Characteristic.FirmwareRevision, '0.0.1'); 
+
+    this.log("Starting a " + config.accessory + " service " + this.name);
 }
 
 WindowCovering.prototype = {
@@ -947,5 +973,81 @@ WindowCovering.prototype = {
     this.log('WindowCovering: Triggered SET HoldPositionState');
 
     callback(null);
-  }
+  },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  setOnOffBit: function(value, callback, db, dbbyte, dbbiton, dbbitoff) {
+    
+    //Set single bit depending on value
+    var S7Client = this.platform.S7Client;
+    var buf = this.buf;
+     
+    //check PLC connection
+    this.platform.S7ClientReconnect();
+    if (S7Client.Connected()) {
+
+      //Set the correct Bit for the operation
+      dbbit = value ? dbbiton : dbbitoff;
+
+      this.buf[0] = 1;
+      this.log.debug("setOnOffBit("+ this.name +") value:"  + value + " DB:" + db + " Byte:"+ dbbyte + " Bit:" + dbbit);
+      // Write single Bit to DB asynchonousely...
+      S7Client.WriteArea(S7Client.S7AreaDB, db, ((dbbyte*8) + dbbit), 1, S7Client.S7WLBit, this.buf, function(err) {
+        if(err) {
+          log("setOnOffBit: >> DBWrite failed." + this.name +") DB:" + db + " Byte:"+ dbbyte + " Bit:" + dbbit+ " Code #" + err + " - " + S7Client.ErrorText(err));
+          S7Client.Disconnect();
+          callback(err);
+        }
+        else {
+          callback(null);
+        }
+      });
+    }
+    else {
+      callback(new Error('PLC not connected'), false);
+    }
+  },
+
+  getBit: function(callback, db, dbbyte, dbbit) {
+    //read single bit
+    var S7Client = this.platform.S7Client;
+
+    //check PLC connection
+    this.platform.S7ClientReconnect();
+    
+    if (S7Client.Connected()) {
+        // Read one bit from PLC DB asynchonousely...
+        this.log.debug("getBit("+ this.name +") DB:" + db + " Byte:"+ dbbyte + " Bit:" + dbbit);
+        S7Client.ReadArea(S7Client.S7AreaDB, db, ((dbbyte*8) + dbbit), 1, S7Client.S7WLBit, function(err, res) {
+          if(err) {
+            log("getBit: >> DBRead failed." + this.name +") DB:" + db + " Byte:"+ dbbyte + " Bit:" + dbbit+ " Code #" + err + " - " + S7Client.ErrorText(err));
+            S7Client.Disconnect();
+            callback(err, 0);
+          }
+          else {
+            callback(null, res[0] ? 1 : 0);
+          }
+        }); 
+      }
+      else {
+        callback(new Error('PLC not connected'), false);
+      }
+    }
+        
+
+
+
 }
+
