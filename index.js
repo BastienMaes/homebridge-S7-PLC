@@ -166,18 +166,13 @@ function LightBulb(platform, config) {
 //LightBulb prototype
 LightBulb.prototype = {
 
-  setPowerOn: function(powerOn, callback) {
+  setPowerOn: function(powerOn, callback, db, dbbyte, dbbiton, dbbitoff) {
     
     //LightBulb send PLC commands ON/OFF or value(%)
     var log = this.log;
     var platform = this.platform;
     var S7Client = this.platform.S7Client;
     var buf = this.buf;
-    var db = this.db;
-    var dbbyte = this.dbbyte;
-    var dbbiton = this.dbbiton;
-    var dbbitoff = this.dbbitoff;
-    var dbbit = 0;
     var state = this.state;
     
     debugLightBulb("setPowerOn: START");
@@ -196,6 +191,7 @@ LightBulb.prototype = {
     }
     
     buf[0] = 1;
+    log("setPowerOn poweron:"  + powerOn+ "state:" + state + " DB:" + db + " Byte:"+ dbbyte + " Bit:" + dbbit);
 
     // Write single Bit to DB asynchonousely...
     S7Client.WriteArea(S7Client.S7AreaDB, db, ((dbbyte*8) + dbbit), 1, S7Client.S7WLBit, buf, function(err) {
@@ -213,14 +209,11 @@ LightBulb.prototype = {
     debugLightBulb("setPowerOn: END");
   },
   
-    getPowerOn: function(callback) {
+    getPowerOn: function(callback, db, dbbyte, dbbit) {
     //LightBulb get PLC status ON/OFF
     var log = this.log;
     var platform = this.platform;
     var S7Client = this.platform.S7Client;
-    var db = this.db;
-    var dbbyte = this.dbbyte;
-    var dbbit = this.dbbitstate;
     var buf = this.buf;
     var state = this.state;
     
@@ -231,6 +224,7 @@ LightBulb.prototype = {
     
     if (S7Client.Connected()) {
         // Read one bit from PLC DB asynchonousely...
+        log("getPowerOn DB:" + db + " Byte:"+ dbbyte + " Bit:" + dbbit);
         S7Client.ReadArea(S7Client.S7AreaDB, db, ((dbbyte*8) + dbbit), 1, S7Client.S7WLBit, function(err, res) {
           if(err) {
             log('getPowerOn: >> DBRead failed. Code #' + err + ' - ' + S7Client.ErrorText(err));
@@ -270,8 +264,8 @@ LightBulb.prototype = {
         var service = this.isOutlet ? new Service.Outlet(this.name, this.name + 'Outlet') : new Service.Lightbulb(this.name, this.name + 'Lightbulb');        
         service
           .getCharacteristic(Characteristic.On)
-          .on('get', this.getPowerOn.bind(this))
-          .on('set', this.setPowerOn.bind(this));
+          .on('get', function(callback) {this.getPowerOn(callback, this.db, this.dbbyte, this.dbbitstate)}.bind(this))
+          .on('set', function(powerOn, callback) { this.setPowerOn(powerOn, callback, this.db, this.dbbyte, this.dbbiton, this.dbbitoff)}.bind(this));
         return [service,informationService];
     }
 }
