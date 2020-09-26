@@ -65,6 +65,10 @@ function S7Platform(log, config) {
     this.connecting = false;
 }
 
+
+
+
+
 S7Platform.prototype = {
     
     //Accessories retrieval
@@ -625,6 +629,7 @@ function Thermostat(platform, config) {
       .setCharacteristic(Characteristic.Model, 'S7-Thermostat')
       .setCharacteristic(Characteristic.SerialNumber, uuid)
       .setCharacteristic(Characteristic.FirmwareRevision, this.FirmwareRevision); 
+      
       
       // create handlers for required characteristics
       this.service.getCharacteristic(Characteristic.CurrentHeatingCoolingState)
