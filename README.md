@@ -16,7 +16,7 @@
 ## Installation
 
 - Basic Installation
-  - Install this plugin using: `npm install -g homebridge-s7-plc`
+  - Install this plugin using: `npm install -g homebridge-s7-plc`    **NOTE this REPRO has currently no prebuild npm install the mentioned and copy the index.js**
   - Edit `config.json` to add the plc platform and its accessories.
   - Run Homebridge
 
@@ -28,59 +28,82 @@
 ## Homebridge configuration
 
 - `S7` platform for 1 PLC (the plugin is not tested for more than 1 PLC)
-  - `IP`: the IPv4 address of the PLC
-  - `RACK`: the rack number of the PLC typically 0
-  - `SLOT`: the slot number of the PLC for S7 300/400 typically `2`, for 1200/1500 typically `1`
+  - `ip`: the IPv4 address of the PLC
+  - `rack`: the rack number of the PLC typically 0
+  - `slot`: the slot number of the PLC for S7 300/400 typically `2`, for 1200/1500 typically `1`
 - in the platform, you can declare different types of accessories:
     - `S7_LightDimm`: it represent a 0/100% dimmable light 
     - `S7_LightBulb`: it represent a ON/OFF light 
-    - `S7_Sensor`: it represent a Temperature sensor
-
+    - `S7_TemperatureSensor`: it represent a temperature sensor
+    - `S7_HumiditySensor`: it represent a humidity sensor
+    - `S7_Thermostat`: it represent a temperature controlling unit
+    - `S7_WindowCovering`: it represent a window blind
+- 
 #### Config.json Example
     {
         "platforms": [
-            {
+        {
+            "name": "Config",
+            "port": 80,
+            "platform": "config"
+        },
+        {
             "platform": "S7",
-            "IP": "192.168.0.25",
-			"RACK": 0,
-			"SLOT": 1,
+            "ip": "10.10.10.32",
+            "rack": 0,
+            "slot": 2,
             "accessories": [
-
-                {
-                    "accessory": "S7_LightDimm",
-                    "name": "Palier",
-                    "DB": 10,
-                    "Byte" : 598 
-                },
                 {
                     "accessory": "S7_LightBulb",
-                    "name": "Chambre",
-                    "manufacturer": "additional identification",
-                    "DB": 10,
-                    "Byte" : 280,
-                    "WriteBitOn" : 3,
-                    "WriteBitOff" : 2,
-                    "ReadBitState" : 1
+                    "name": "Büro DG",
+                    "db": 6094,
+                    "set_On": 0.9,
+                    "set_Off": 0.8,
+                    "get_State": 0
                 },
                 {
                     "accessory": "S7_Outlet",
-                    "name": "TV",
-                    "manufacturer": "additional identification",
-                    "DB": 10,
-                    "Byte" : 280,
-                    "WriteBitOn" : 10,
-                    "WriteBitOff" : 9,
-                    "ReadBitState" : 8
+                    "name": "Terassensteckdose",
+                    "db": 6107,
+                    "set_On": 0.9,
+                    "set_Off": 0.8,
+                    "get_State": 0
                 },
                 {
-                    "accessory": "S7_Sensor",
-                    "name": "Température de la chambre",
-                    "DB": 10,
-                    "Byte" : 888
+                    "accessory": "S7_HumiditySensor",
+                    "name": "Außen %",
+                    "manufacturer": "Dach",
+                    "db": 1901,
+                    "get_CurrentRelativeHumidity": 16
+                },
+                {
+                    "accessory": "S7_TemperatureSensor",
+                    "name": "Außen °C",
+                    "manufacturer": "Dach",
+                    "db": 1901,
+                    "get_CurrentTemperature": 4
+                },
+                {
+                    "accessory": "S7_Thermostat",
+                    "name": "Büro DG °C",
+                    "manufacturer": "DG",
+                    "db": 6610,
+                    "get_CurrentTemperature": 2,
+                    "get_TargetTemperature": 6,
+                    "set_TargetTemperature": 10
+                },
+                {
+                    "accessory": "S7_WindowCovering",
+                    "name": "Wohnzimmer Rollo",
+                    "manufacturer": "EG",
+                    "db": 2602,
+                    "get_CurrentPosition": 2,
+                    "get_TargetPosition": 8,
+                    "set_TargetPosition": 8
                 }
             ]
         }
-        ]
+    ]
     }
 
 ## PLC configuration
