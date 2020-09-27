@@ -1,4 +1,4 @@
-var Accessory, Service, Characteristic, UUIDGen;
+var PlatformAccessory, Service, Characteristic, UUIDGen;
 var snap7 = require('node-snap7');
 
 
@@ -19,7 +19,7 @@ module.exports = function(homebridge) {
   Service = homebridge.hap.Service;
   Characteristic = homebridge.hap.Characteristic;
   UUIDGen = homebridge.hap.uuid;
-  Accessory = homebridge.platformAccessory;
+  PlatformAccessory = homebridge.platformAccessory;
   homebridge.registerPlatform(platformName, 'S7', S7Platform);
   homebridge.registerAccessory(platformName, 'S7_LightDimm', GenericS7, true);
   homebridge.registerAccessory(platformName, 'S7_LightBulb', GenericS7, true);
@@ -49,13 +49,8 @@ function S7Platform(log, config) {
     this.log = log;
     this.config = config;
     this.S7Client = new snap7.S7Client();
-    var ip = this.config.ip;
-    var rack = this.config.rack;
-    var slot = this.config.slot;    
-    //PLC connection synchonousely...
-    this.log("S7Client connecting to %s (%s:%s)", ip, rack, slot);
-    this.S7Client.ConnectTo(ip, rack, slot);
     this.connecting = false;
+    this.S7ClientReconnect();
 }
 
 S7Platform.prototype = {    
@@ -88,19 +83,17 @@ S7Platform.prototype = {
         var connecting = this.connecting;
         
         if (!S7Client.Connected()) {
-            log("S7ClientReconnect: >> S7Client connecting to %s (%s:%s) connecting=%s", ip, rack, slot, connecting);
+            log("Connecting to %s (%s:%s)", ip, rack, slot);
 
-            if (!connecting) {
-                this.connecting = true;
+            if (!this.connecting == true) {
+              this.connecting = true;
                 //PLC connection asynchonousely...
                 S7Client.ConnectTo(ip, rack, slot, function(err) {
                   if(err) {
-                    log('S7ClientReconnect: >> Connection failed. Code #' + err + ' - ' + S7Client.ErrorText(err));
-                    log("S7ClientReconnect: >> S7Client connecting=%s", connecting);
+                    log.Error('Connection failed. Code #' + err + ' - ' + S7Client.ErrorText(err));
                   }
                   else {
-                    log("S7ClientReconnect: connected to %s (%s:%s)", ip, rack, slot);
-                    
+                    log("Connected to %s (%s:%s)", ip, rack, slot);
                   }
                   this.connecting = false;
                 });
@@ -120,7 +113,7 @@ function GenericS7(platform, config) {
   this.name = config.name;
   this.buf = Buffer.alloc(4);
   var uuid = UUIDGen.generate(config.name + config.accessory);
-  this.accessory = new Accessory(this.name, uuid); 
+  this.accessory = new PlatformAccessory(this.name, uuid); 
 
   ////////////////////////////////////////////////////////////////
   // Lightbulb
@@ -295,17 +288,20 @@ function GenericS7(platform, config) {
     this.service.getCharacteristic(Characteristic.CurrentPosition)
       .on('get', function(callback) {this.getReal(callback, 
         config.db, 
-        config.get_CurrentPosition
+        config.get_CurrentPosition,
+        this.adaptWindowCoveringValue
         )}.bind(this));
 
     this.service.getCharacteristic(Characteristic.TargetPosition)
       .on('get', function(callback) {this.getReal(callback, 
         config.db, 
-        config.get_TargetPosition
+        config.get_TargetPosition,
+        this.adaptWindowCoveringValue
         )}.bind(this))
       .on('set', function(value, callback) {this.setReal(value, callback, 
         config.db, 
-        config.set_TargetPosition
+        config.set_TargetPosition,
+        this.adaptWindowCoveringValue
         )}.bind(this));
 
     this.service.getCharacteristic(Characteristic.PositionState)
@@ -333,6 +329,10 @@ GenericS7.prototype = {
 
   getServices: function() {
     return [this.accessory.getService(Service.AccessoryInformation), this.service];
+  },
+
+  adaptWindowCoveringValue: function(value) {
+    return 100-value;
   },
 
   //////////////////////////////////////////////////////////////////////////////
@@ -421,14 +421,17 @@ GenericS7.prototype = {
   //////////////////////////////////////////////////////////////////////////////
   // REAL
   //////////////////////////////////////////////////////////////////////////////
-  setReal: function(value, callback, db, offset) {
+  setReal: function(value, callback, db, offset, valueMod) {
     var S7Client = this.platform.S7Client;
     var log = this.log;
     var name = this.name;
     var buf = this.buf
     //check PLC connection
     this.platform.S7ClientReconnect();
-    
+    if (typeof(valueMod) != "undefined")
+    {
+      value = valueMod(value);
+    }
     if (S7Client.Connected()) {
         buf.writeFloatBE(value, 0);
         // Write one real from DB asynchonousely...
@@ -449,7 +452,7 @@ GenericS7.prototype = {
     }
   },
     
-  getReal: function(callback, db, offset) {
+  getReal: function(callback, db, offset, valueMod) {
     var S7Client = this.platform.S7Client;
     var log = this.log;
     var name = this.name;
@@ -468,6 +471,10 @@ GenericS7.prototype = {
           }
           else {              
             value = res.readFloatBE(0);
+            if (typeof(valueMod) != "undefined")
+            {
+              value = valueMod(value);
+            }            
             log.debug("getReal("+ name +") DB" + db + "DBD"+ offset + ": " + value);
             callback(null, value);
           }
