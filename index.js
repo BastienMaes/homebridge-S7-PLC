@@ -828,8 +828,15 @@ function WindowCovering(platform, config) {
     this.accessory.addService(this.service);
 
     this.service.getCharacteristic(Characteristic.On)
-      .on('get', function(callback) {this.getBit(callback, config.db, config.dbbyte, config.dbbitstate)}.bind(this))
-      .on('set', function(powerOn, callback) { this.setOnOffBit(powerOn, callback, config.db, config.dbbyte, config.dbbiton, config.dbbitoff)}.bind(this));
+      .on('get', function(callback) {this.getBit(callback, 
+        config.db, 
+        Math.floor(config.get_state), Math.floor((config.get_state*10)%10)
+      )}.bind(this))
+      .on('set', function(powerOn, callback) { this.setOnOffBit(powerOn, callback, 
+        config.db, 
+        Math.floor(config.set_on), Math.floor((config.set_on*10)%10),
+        Math.floor(config.set_off), Math.floor((config.set_off*10)%10),
+      )}.bind(this));
   }
   else if (config.accessory == 'S7_Thermostat') { 
 
@@ -988,7 +995,7 @@ WindowCovering.prototype = {
 
 
 
-  setOnOffBit: function(value, callback, db, dbbyte, dbbiton, dbbitoff) {
+  setOnOffBit: function(value, callback, db, on_offset, on_bit, off_offset, off_bit) {
     
     //Set single bit depending on value
     var S7Client = this.platform.S7Client;
@@ -999,14 +1006,15 @@ WindowCovering.prototype = {
     if (S7Client.Connected()) {
 
       //Set the correct Bit for the operation
-      dbbit = value ? dbbiton : dbbitoff;
+      const offset = value ? on_offset : off_offset;
+      const bit = value ? on_bit : off_bit;
 
       this.buf[0] = 1;
-      this.log.debug("setOnOffBit("+ this.name +") value:"  + value + " DB:" + db + " Byte:"+ dbbyte + " Bit:" + dbbit);
+      this.log.debug("setOnOffBit("+ this.name +") value:"  + value + " DB" + db + "DBX"+ offset + "." + bit);
       // Write single Bit to DB asynchonousely...
-      S7Client.WriteArea(S7Client.S7AreaDB, db, ((dbbyte*8) + dbbit), 1, S7Client.S7WLBit, this.buf, function(err) {
+      S7Client.WriteArea(S7Client.S7AreaDB, db, ((offset*8) + bit), 1, S7Client.S7WLBit, this.buf, function(err) {
         if(err) {
-          log("setOnOffBit: >> DBWrite failed." + this.name +") DB:" + db + " Byte:"+ dbbyte + " Bit:" + dbbit+ " Code #" + err + " - " + S7Client.ErrorText(err));
+          log("setOnOffBit: >> WriteArea failed." + this.name +") DB" + db + "DBX"+ offset + "." + bit +" Code #" + err + " - " + S7Client.ErrorText(err));
           S7Client.Disconnect();
           callback(err);
         }
@@ -1020,7 +1028,7 @@ WindowCovering.prototype = {
     }
   },
 
-  getBit: function(callback, db, dbbyte, dbbit) {
+  getBit: function(callback, db, offset, bit) {
     //read single bit
     var S7Client = this.platform.S7Client;
 
@@ -1029,10 +1037,11 @@ WindowCovering.prototype = {
     
     if (S7Client.Connected()) {
         // Read one bit from PLC DB asynchonousely...
-        this.log.debug("getBit("+ this.name +") DB:" + db + " Byte:"+ dbbyte + " Bit:" + dbbit);
-        S7Client.ReadArea(S7Client.S7AreaDB, db, ((dbbyte*8) + dbbit), 1, S7Client.S7WLBit, function(err, res) {
+        this.log.debug("getBit("+ this.name +") DB" + db + "DBX"+ offset + "." + bit);
+
+        S7Client.ReadArea(S7Client.S7AreaDB, db, ((offset*8) + bit), 1, S7Client.S7WLBit, function(err, res) {
           if(err) {
-            log("getBit: >> DBRead failed." + this.name +") DB:" + db + " Byte:"+ dbbyte + " Bit:" + dbbit+ " Code #" + err + " - " + S7Client.ErrorText(err));
+            log("getBit: >> ReadArea failed." + this.name +") DB" + db + "DBX"+ offset + "." + bit +" Code #" + err + " - " + S7Client.ErrorText(err));
             S7Client.Disconnect();
             callback(err, 0);
           }
