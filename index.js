@@ -2,16 +2,6 @@ var PlatformAccessory, Service, Characteristic, UUIDGen;
 var snap7 = require('node-snap7');
 
 
-var S7accessory = {
-    "S7_LightBulb": GenericS7,
-    "S7_LightDimm": GenericS7,
-    "S7_Outlet": GenericS7,
-    "S7_HumiditySensor" : GenericS7,
-    "S7_TemperatureSensor" : GenericS7,
-    "S7_Thermostat" : GenericS7,
-    "S7_WindowCovering": GenericS7
-}//this var is used to have a unique constructor for accessories instanciation in platform
-
 //Exports
 module.exports = function(homebridge) {
   // Service and Characteristic from hap-nodejs/lib/gen/HomeKitTypes.js
@@ -21,6 +11,8 @@ module.exports = function(homebridge) {
   UUIDGen = homebridge.hap.uuid;
   PlatformAccessory = homebridge.platformAccessory;
   homebridge.registerPlatform(platformName, 'S7', S7Platform);
+
+  /* currently not funtional
   homebridge.registerAccessory(platformName, 'S7_LightDimm', GenericS7, true);
   homebridge.registerAccessory(platformName, 'S7_LightBulb', GenericS7, true);
   homebridge.registerAccessory(platformName, 'S7_Outlet', GenericS7, true);  
@@ -28,65 +20,55 @@ module.exports = function(homebridge) {
   homebridge.registerAccessory(platformName, 'S7_TemperatureSensor', GenericS7, true);  
   homebridge.registerAccessory(platformName, 'S7_Thermostat', GenericS7, true);  
   homebridge.registerAccessory(platformName, 'S7_WindowCovering', GenericS7, true);    
+  homebridge.registerAccessory(platformName, 'S7_Window', GenericS7, true);    
+  homebridge.registerAccessory(platformName, 'S7_OccupancySensor', GenericS7, true);      
+  homebridge.registerAccessory(platformName, 'S7_MotionSensor', GenericS7, true);      
+  homebridge.registerAccessory(platformName, 'S7_Faucet', GenericS7, true);        
+  */
 }
 
-//Platform definitions
-//S7
-//config.json:
 
-//  "platforms": [
-//        {
-//      "platform": "S7",
-//      "ip": "10.10.10.10",
-//      "rack": 0,
-//      "slot": 2,
-//      "accessories": []
-//  }
-//  ]
 
 function S7Platform(log, config) {
     //initialize
     this.log = log;
     this.config = config;
     this.S7Client = new snap7.S7Client();
-    this.connecting = false;
-    this.S7ClientReconnect();
+    this.isConnectOngoing = false;
+    this.S7ClientConnect();
 }
 
 S7Platform.prototype = {    
     //Accessories retrieval
     accessories: function(callback) {
         var log = this.log;
-
+        var s7PlatformAccessories = [];
         log("Add S7 accessories...");
-        //For each device, create an accessory!
-        var foundAccessories = this.config.accessories;
-        //create array of accessories
-        var platformAccessories = [];
-        
-        for (var i = 0; i < foundAccessories.length; i++) {
-            log("[" + i + "/" + foundAccessories.length + "] " + foundAccessories[i].name + " (" +  foundAccessories[i].accessory + ")" );
-            //Call accessoryConstruction
-            var accessory = new S7accessory[foundAccessories[i].accessory](this, foundAccessories[i]);
-            platformAccessories.push(accessory);
-        }
-        callback(platformAccessories);
+        //create accessory for each configuration
+        this.config.accessories.forEach((config, index) => {
+            log("[" + index+1 + "/" + this.config.accessories.length + "] " + config.name + " (" +  config.accessory + ")" );
+            //call accessory construction
+            var accessory = new GenericS7(this, config);
+            s7PlatformAccessories.push(accessory);
+        });
+
+        callback(s7PlatformAccessories);
     },
     
     //PLC connection check function
-    S7ClientReconnect: function() {
+    S7ClientConnect: function() {
         var log = this.log;
         var S7Client = this.S7Client;
         var ip = this.config.ip;
         var rack = this.config.rack;
         var slot = this.config.slot;
-        var connecting = this.connecting;
+        var isConnectOngoing = this.isConnectOngoing;
         
         if (!S7Client.Connected()) {
             log("Connecting to %s (%s:%s)", ip, rack, slot);
 
-            if (!this.connecting == true) {
-              this.connecting = true;
+            if (!this.isConnectOngoing == true) {
+              this.isConnectOngoing = true;
                 //PLC connection asynchonousely...
                 S7Client.ConnectTo(ip, rack, slot, function(err) {
                   if(err) {
@@ -95,7 +77,7 @@ S7Platform.prototype = {
                   else {
                     log("Connected to %s (%s:%s)", ip, rack, slot);
                   }
-                  this.connecting = false;
+                  this.isConnectOngoing = false;
                 });
             }
         }
@@ -137,7 +119,7 @@ function GenericS7(platform, config) {
   ////////////////////////////////////////////////////////////////
   // S7_LightBulbDim
   ////////////////////////////////////////////////////////////////
-  if (config.accessory == 'S7_LightBulbDim') {   
+  else if (config.accessory == 'S7_LightBulbDim') {   
     this.service =  new Service.Lightbulb(this.name);
     this.accessory.addService(this.service);
 
@@ -171,7 +153,7 @@ function GenericS7(platform, config) {
   ////////////////////////////////////////////////////////////////
   // Outlet
   ////////////////////////////////////////////////////////////////    
-  if (config.accessory == 'S7_Outlet') {   
+  else if (config.accessory == 'S7_Outlet') {   
     this.service =  new Service.Outlet(this.name);
     this.accessory.addService(this.service);
 
@@ -190,7 +172,7 @@ function GenericS7(platform, config) {
   ////////////////////////////////////////////////////////////////
   // TemperatureSensor
   //////////////////////////////////////////////////////////////// 
-  if (config.accessory == 'S7_TemperatureSensor') {   
+  else if (config.accessory == 'S7_TemperatureSensor') {   
     this.service =  new Service.TemperatureSensor(this.name);
     this.accessory.addService(this.service);
 
@@ -209,7 +191,7 @@ function GenericS7(platform, config) {
   ////////////////////////////////////////////////////////////////
   // HumiditySensor
   //////////////////////////////////////////////////////////////// 
-  if (config.accessory == 'S7_HumiditySensor') {   
+  else if (config.accessory == 'S7_HumiditySensor') {   
     this.service =  new Service.HumiditySensor(this.name);
     this.accessory.addService(this.service);
 
@@ -232,12 +214,21 @@ function GenericS7(platform, config) {
     this.service = new Service.Thermostat(this.name);
     this.accessory.addService(this.service);
 
-  this.service.getCharacteristic(Characteristic.CurrentHeatingCoolingState)
-  .on('get', function(callback) {this.getDummy(callback,
-    1, // currently return fixed value inactive=0, idle=1, heating=2, cooling=3
-    'CurrentHeatingCoolingState'
-    )}.bind(this));
-
+    if ('get_CurrentHeaterCoolerState' in config) {
+      this.service.getCharacteristic(Characteristic.CurrentHeatingCoolingState)
+      .on('get', function(callback) {this.getByte(callback,
+        config.db, 
+        config.get_CurrentHeaterCoolerState
+        )}.bind(this));
+    }
+    else
+    {
+      this.service.getCharacteristic(Characteristic.CurrentHeatingCoolingState)
+      .on('get', function(callback) {this.getDummy(callback,
+        1, // currently return fixed value inactive=0, idle=1, heating=2, cooling=3
+        'CurrentHeatingCoolingState'
+        )}.bind(this));
+    }
   this.service.getCharacteristic(Characteristic.TargetHeatingCoolingState)
   .on('get', function(callback) {this.getDummy(callback,
     3, // currently return fixed value off=0, heat=1, cool=2, automatic=3
@@ -304,16 +295,149 @@ function GenericS7(platform, config) {
         this.adaptWindowCoveringValue
         )}.bind(this));
 
-    this.service.getCharacteristic(Characteristic.PositionState)
+    if ('get_PositionState' in config) {
+      this.service.getCharacteristic(Characteristic.PositionState)
+        .on('get', function(callback) {this.getReal(callback, 
+          config.db, 
+          config.get_PositionState,
+        )}.bind(this));
+    }
+    else {
+        this.service.getCharacteristic(Characteristic.PositionState)
       .on('get', function(callback) {this.getDummy(callback,
         2,
         'PositionState'
         )}.bind(this));
+    }
       
+    if ('set_HoldPosition' in config) {
     this.service.getCharacteristic(Characteristic.HoldPosition)
-      .on('get', function(callback) {this.handleDummy(callback, 
-        'HoldPosition'        
+      .on('set', function(value, callback) { this.setBit(value, callback, 
+        config.db,
+        Math.floor(config.set_HoldPosition), Math.floor((config.set_HoldPosition*10)%10),
         )}.bind(this));
+    }
+    else {
+      this.service.getCharacteristic(Characteristic.HoldPosition)
+        .on('get', function(callback) {this.handleDummy(callback, 
+          'HoldPosition'        
+          )}.bind(this));
+    }
+  }
+ ////////////////////////////////////////////////////////////////
+  // Window
+  ////////////////////////////////////////////////////////////////    
+  else if (config.accessory == 'S7_Window'){ 
+    this.service = new Service.Window(this.name);
+    this.accessory.addService(this.service);
+
+    // create handlers for required characteristics
+    this.service.getCharacteristic(Characteristic.CurrentPosition)
+      .on('get', function(callback) {this.getReal(callback, 
+        config.db, 
+        config.get_CurrentPosition,
+        this.adaptWindowCoveringValue
+        )}.bind(this));
+
+    if ('get_TargetPosition' in config) {        
+      this.service.getCharacteristic(Characteristic.TargetPosition)
+        .on('get', function(callback) {this.getReal(callback, 
+          config.db, 
+          config.get_TargetPosition,
+          this.adaptWindowCoveringValue
+          )}.bind(this))
+        .on('set', function(value, callback) {this.setReal(value, callback, 
+          config.db, 
+          config.set_TargetPosition,
+          this.adaptWindowCoveringValue
+          )}.bind(this));
+      }
+      else
+      {
+        this.service.getCharacteristic(Characteristic.TargetPosition)
+          .on('get', function(callback) {this.getDummy(callback, 
+            0,
+            'TargetPosition'
+            )}.bind(this))
+          .on('set', function(value, callback) {this.setDummy(value, callback, 
+            'TargetPosition'
+            )}.bind(this));
+      }
+    if ('get_PositionState' in config) {
+      this.service.getCharacteristic(Characteristic.PositionState)
+        .on('get', function(callback) {this.getReal(callback, 
+          config.db, 
+          config.get_PositionState,
+        )}.bind(this));
+    }
+    else {
+        this.service.getCharacteristic(Characteristic.PositionState)
+      .on('get', function(callback) {this.getDummy(callback,
+        2,
+        'PositionState'
+        )}.bind(this));
+    }
+      
+    if ('set_HoldPosition' in config) {
+    this.service.getCharacteristic(Characteristic.HoldPosition)
+      .on('set', function(value, callback) { this.setBit(value, callback, 
+        config.db,
+        Math.floor(config.set_HoldPosition), Math.floor((config.set_HoldPosition*10)%10),
+        )}.bind(this));
+    }
+    else {
+      this.service.getCharacteristic(Characteristic.HoldPosition)
+        .on('get', function(callback) {this.handleDummy(callback, 
+          'HoldPosition'        
+          )}.bind(this));
+    }
+  }  
+  ////////////////////////////////////////////////////////////////
+  // OccupancySensor
+  ////////////////////////////////////////////////////////////////   
+  else if (config.accessory == 'S7_OccupancySensor'){
+    this.service = new Service.OccupancySensor(this.name);
+    this.accessory.addService(this.service);
+
+    this.service.getCharacteristic(Characteristic.OccupancyDetected)
+      .on('get', function(callback) {this.getBit(callback, 
+        config.db, 
+        Math.floor(config.get_OccupancyDetected), Math.floor((config.get_OccupancyDetected*10)%10)
+      )}.bind(this))    
+  }
+  ////////////////////////////////////////////////////////////////
+  // MotionSensor
+  ////////////////////////////////////////////////////////////////   
+  else if (config.accessory == 'S7_MotionSensor'){
+    this.service = new Service.OccupancySensor(this.name);
+    this.accessory.addService(this.service);
+
+    this.service.getCharacteristic(Characteristic.MotionDetected)
+      .on('get', function(callback) {this.getBit(callback, 
+        config.db, 
+        Math.floor(config.get_MotionDetected), Math.floor((config.get_MotionDetected*10)%10)
+      )}.bind(this))    
+  }  
+  ////////////////////////////////////////////////////////////////
+  // Faucet
+  ////////////////////////////////////////////////////////////////   
+  else if (config.accessory == 'S7_Faucet'){
+    this.service =  new Service.Faucet(this.name);
+    this.accessory.addService(this.service);
+
+    this.service.getCharacteristic(Characteristic.Active)
+      .on('get', function(callback) {this.getBit(callback, 
+        config.db, 
+        Math.floor(config.get_State), Math.floor((config.get_State*10)%10)
+      )}.bind(this))
+      .on('set', function(powerOn, callback) { this.setOnOffBit(powerOn, callback, 
+        config.db, 
+        Math.floor(config.set_On), Math.floor((config.set_On*10)%10),
+        Math.floor(config.set_Off), Math.floor((config.set_Off*10)%10),
+      )}.bind(this));
+  }
+  else {
+    this.log("Accessory "+ config.accessory + " is not defined.")
   }
       
   this.accessory.getService(Service.AccessoryInformation)
@@ -323,6 +447,7 @@ function GenericS7(platform, config) {
   .setCharacteristic(Characteristic.FirmwareRevision, '0.0.1'); 
 
   this.log.debug("Done " + this.name + " (" + config.accessory + ")");
+
 }
 
 GenericS7.prototype = {
@@ -364,13 +489,10 @@ GenericS7.prototype = {
     var log = this.log;
     var name = this.name;
     //check PLC connection
-    this.platform.S7ClientReconnect();
+    this.platform.S7ClientConnect();
     if (S7Client.Connected()) {
-
-      //Set the correct Bit for the operation
       const offset = value ? on_offset : off_offset;
       const bit = value ? on_bit : off_bit;
-
       this.buf[0] = 1;
       // Write single Bit to DB asynchonousely...
       S7Client.WriteArea(S7Client.S7AreaDB, db, ((offset*8) + bit), 1, S7Client.S7WLBit, this.buf, function(err) {
@@ -390,13 +512,42 @@ GenericS7.prototype = {
     }
   },
 
+  setBit: function(value, callback, db, offset, bit, ) {    
+    //Set single bit depending on value
+    var S7Client = this.platform.S7Client;
+    var buf = this.buf;
+    var log = this.log;
+    var name = this.name;
+    //check PLC connection
+    this.platform.S7ClientConnect();
+    if (S7Client.Connected()) {
+      this.buf[0] = value ? 1 : 0;
+      // Write single Bit to DB asynchonousely...
+      S7Client.WriteArea(S7Client.S7AreaDB, db, ((offset*8) + bit), 1, S7Client.S7WLBit, this.buf, function(err) {
+        if(err) {
+          log("setOnOffBit("+ name +") >> WriteArea failed DB" + db + "DBX"+ offset + "." + bit +" Code #" + err + " - " + S7Client.ErrorText(err));
+          S7Client.Disconnect();
+          callback(err);
+        }
+        else {
+          log.debug("setOnOffBit("+ name +") DB" + db + "DBX"+ offset + "." + bit + ": " + value);
+          callback(null);
+        }
+      });
+    }
+    else {
+      callback(new Error('PLC not connected'), false);
+    }
+  },
+
+
   getBit: function(callback, db, offset, bit) {
     //read single bit
     var S7Client = this.platform.S7Client;
     var log = this.log;
     var name = this.name;
     //check PLC connection
-    this.platform.S7ClientReconnect();
+    this.platform.S7ClientConnect();
       
     if (S7Client.Connected()) {
       // Read one bit from PLC DB asynchonousely...
@@ -427,7 +578,7 @@ GenericS7.prototype = {
     var name = this.name;
     var buf = this.buf
     //check PLC connection
-    this.platform.S7ClientReconnect();
+    this.platform.S7ClientConnect();
     if (typeof(valueMod) != "undefined")
     {
       value = valueMod(value);
@@ -458,7 +609,7 @@ GenericS7.prototype = {
     var name = this.name;
     var value = 0;
     //check PLC connection
-    this.platform.S7ClientReconnect();
+    this.platform.S7ClientConnect();
     
     if (S7Client.Connected()) {
         // Write one real from DB asynchonousely...
@@ -483,11 +634,146 @@ GenericS7.prototype = {
     else {
         callback(new Error('PLC not connected'));
     }
+  },
+
+
+  //////////////////////////////////////////////////////////////////////////////
+  // BYTE
+  //////////////////////////////////////////////////////////////////////////////
+  setByte: function(value, callback, db, offset, valueMod) {
+    var S7Client = this.platform.S7Client;
+    var log = this.log;
+    var name = this.name;
+    var buf = this.buf
+    //check PLC connection
+    this.platform.S7ClientConnect();
+    if (typeof(valueMod) != "undefined")
+    {
+      value = valueMod(value);
+    }
+    if (S7Client.Connected()) {
+        buf[0] = value;
+        // Write one real from DB asynchonousely...
+        S7Client.WriteArea(S7Client.S7AreaDB, db, offset, 1, S7Client.S7WLByte, buf, function(err) {
+          if(err) {
+            log("setReal: >> WriteArea failed." + name +") DB" + db + "DBB"+ offset +" Code #" + err + " - " + S7Client.ErrorText(err));
+            S7Client.Disconnect();
+            callback(err);
+          }
+          else {              
+            log.debug("setReal("+ name +") DB" + db + "DBB"+ offset + ": " + value);
+            callback(null);
+          }
+        });
+    }
+    else {
+        callback(new Error('PLC not connected'));
+    }
+  },
+    
+  getByte: function(callback, db, offset, valueMod) {
+    var S7Client = this.platform.S7Client;
+    var log = this.log;
+    var name = this.name;
+    var value = 0;
+    //check PLC connection
+    this.platform.S7ClientConnect();
+    
+    if (S7Client.Connected()) {
+        // Write one real from DB asynchonousely...
+        
+        S7Client.ReadArea(S7Client.S7AreaDB, db, offset, 1, S7Client.S7WLByte, function(err, res) {
+          if(err) {
+            log("getReal("+ name +") >> ReadArea failed DB" + db + "DBB"+ offset +" Code #" + err + " - " + S7Client.ErrorText(err));
+            S7Client.Disconnect();
+            callback(err);
+          }
+          else {              
+            value = res[0];
+            if (typeof(valueMod) != "undefined")
+            {
+              value = valueMod(value);
+            }            
+            log.debug("getReal("+ name +") DB" + db + "DBB"+ offset + ": " + value);
+            callback(null, value);
+          }
+        });
+    }
+    else {
+        callback(new Error('PLC not connected'));
+    }
+  },
+
+
+
+  //////////////////////////////////////////////////////////////////////////////
+  // INT
+  //////////////////////////////////////////////////////////////////////////////
+  setInt: function(value, callback, db, offset, valueMod) {
+    var S7Client = this.platform.S7Client;
+    var log = this.log;
+    var name = this.name;
+    var buf = this.buf
+    //check PLC connection
+    this.platform.S7ClientConnect();
+    if (typeof(valueMod) != "undefined")
+    {
+      value = valueMod(value);
+    }
+    if (S7Client.Connected()) {
+        buf.writeInt16BE(value, 0);
+        // Write one real from DB asynchonousely...
+        S7Client.WriteArea(S7Client.S7AreaDB, db, offset, 1, S7Client.S7WLWord, buf, function(err) {
+          if(err) {
+            log("setReal: >> WriteArea failed." + name +") DB" + db + "DBW"+ offset +" Code #" + err + " - " + S7Client.ErrorText(err));
+            S7Client.Disconnect();
+            callback(err);
+          }
+          else {              
+            log.debug("setReal("+ name +") DB" + db + "DBW"+ offset + ": " + value);
+            callback(null);
+          }
+        });
+    }
+    else {
+        callback(new Error('PLC not connected'));
+    }
+  },
+    
+  getInt: function(callback, db, offset, valueMod) {
+    var S7Client = this.platform.S7Client;
+    var log = this.log;
+    var name = this.name;
+    var value = 0;
+    //check PLC connection
+    this.platform.S7ClientConnect();
+    
+    if (S7Client.Connected()) {
+        // Write one real from DB asynchonousely...
+        
+        S7Client.ReadArea(S7Client.S7AreaDB, db, offset, 1, S7Client.S7WLWord, function(err, res) {
+          if(err) {
+            log("getReal("+ name +") >> ReadArea failed DB" + db + "DBW"+ offset +" Code #" + err + " - " + S7Client.ErrorText(err));
+            S7Client.Disconnect();
+            callback(err);
+          }
+          else {              
+            value = res.readInt16BE(0);
+            if (typeof(valueMod) != "undefined")
+            {
+              value = valueMod(value);
+            }            
+            log.debug("getReal("+ name +") DB" + db + "DBW"+ offset + ": " + value);
+            callback(null, value);
+          }
+        });
+    }
+    else {
+        callback(new Error('PLC not connected'));
+    }
   }
 
 
-
-
-
+  
 }
 
