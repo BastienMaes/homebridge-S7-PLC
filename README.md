@@ -27,7 +27,10 @@
 
 ## Homebridge configuration
 
-- 1 `S7` platform for 1 PLC (the plugin is not tested for more than 1 PLC)
+- `S7` platform for 1 PLC (the plugin is not tested for more than 1 PLC)
+  - `IP`: the IPv4 address of the PLC
+  - `RACK`: the rack number of the PLC typically 0
+  - `SLOT`: the slot number of the PLC for S7 300/400 typically `2`, for 1200/1500 typically `1`
 - in the platform, you can declare different types of accessories:
     - `S7_LightDimm`: it represent a 0/100% dimmable light 
     - `S7_LightBulb`: it represent a ON/OFF light 
@@ -39,6 +42,8 @@
             {
             "platform": "S7",
             "IP": "192.168.0.25",
+			"RACK": 0,
+			"SLOT": 1,
             "accessories": [
 
                 {
