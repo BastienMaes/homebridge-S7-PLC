@@ -1,6 +1,6 @@
 {
   "name": "homebridge-s7-plc",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "SIEMENS S7 PLC plugin for HomeBridge (https://github.com/homebridge).",
   "license": "MIT",
   "keywords": [
@@ -27,5 +27,8 @@
   "dependencies": {
     "node-snap7": ">=1.0.3",
     "debug": ">=4.1.1"
+  }
+    "scripts": {
+    "postpublish" : "PACKAGE_VERSION=$(cat package.json | grep \\\"version\\\" | head -1 | awk -F: '{ print $2 }' | sed 's/[\",]//g' | tr -d '[[:space:]]') && git tag v$PACKAGE_VERSION && git push --tags",
   }
 }
