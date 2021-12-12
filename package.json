@@ -1,11 +1,13 @@
 {
   "name": "homebridge-s7-plc",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "description": "SIEMENS S7 PLC plugin for HomeBridge (https://github.com/homebridge).",
   "license": "MIT",
   "keywords": [
     "homebridge-plugin",
     "homebridge",
+    "HomeKit",
+    "Apple",
     "S7",
     "PLC",
     "SIEMENS",
